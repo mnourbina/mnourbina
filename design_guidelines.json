@@ -1,0 +1,136 @@
+{
+  "theme": "Light",
+  "archetype": "Organic & Earthy",
+  "rationale": "Medical and maternal health context in Africa requires warmth, trust, and serenity. We avoid sterile clinical greys and childish pinks/teals, opting for grounded earthy tones that signify life and growth, remaining highly credible to ministries of health.",
+  "typography": {
+    "heading_font": "Outfit",
+    "body_font": "Manrope",
+    "font_weights": {
+      "headings": "600-800",
+      "body": "400-500",
+      "labels": "600"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl tracking-tight text-slate-900",
+      "h2": "text-2xl sm:text-3xl tracking-tight text-slate-800",
+      "h3": "text-xl sm:text-2xl font-semibold text-slate-800",
+      "body": "text-base leading-relaxed text-slate-600",
+      "small": "text-sm text-slate-500",
+      "overline": "text-xs font-bold uppercase tracking-widest text-[#B85C38]"
+    }
+  },
+  "color_palette": {
+    "background": {
+      "primary": "#FBFaf8",
+      "secondary": "#FFFFFF",
+      "surface": "#F2EFEB"
+    },
+    "primary": {
+      "DEFAULT": "#C05C3D",
+      "hover": "#A64D32",
+      "light": "#FDF2EF"
+    },
+    "text": {
+      "primary": "#2C3E35",
+      "secondary": "#5C6B62",
+      "muted": "#8A9A91"
+    },
+    "status": {
+      "urgent": "#D9381E",
+      "warning": "#E59500",
+      "normal": "#2D7D46"
+    },
+    "border": "#E5E1D8"
+  },
+  "spacing_and_layout": {
+    "patient_portal": {
+      "grid": "bento",
+      "padding": "p-6 md:p-8",
+      "radius": "rounded-2xl",
+      "shadow": "shadow-sm",
+      "notes": "Large tap targets (min 48px). Mobile-first. High contrast. Minimal UI noise."
+    },
+    "professional_portal": {
+      "grid": "control_room",
+      "padding": "p-4",
+      "radius": "rounded-lg",
+      "shadow": "shadow-sm",
+      "notes": "Dense UI, tight spacing, collapsible Shadcn accordions for 7-section CPN forms."
+    },
+    "admin_portal": {
+      "grid": "dashboard",
+      "padding": "p-4",
+      "radius": "rounded-lg",
+      "shadow": "shadow-sm border border-slate-200",
+      "notes": "Data-dense, bento grid for 19 KPIs, sticky filter bars, Recharts integration."
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#C05C3D] text-white hover:bg-[#A64D32] rounded-xl px-6 py-3 transition-colors",
+      "secondary": "bg-white text-[#C05C3D] border border-[#C05C3D] hover:bg-[#FDF2EF] rounded-xl px-6 py-3 transition-colors"
+    },
+    "cards": {
+      "patient": "bg-white rounded-2xl shadow-sm border border-[#E5E1D8] p-6",
+      "clinical": "bg-white rounded-lg shadow-sm border border-[#E5E1D8] p-4",
+      "admin_kpi": "bg-white rounded-lg border border-[#E5E1D8] p-4 flex flex-col gap-2"
+    },
+    "vaccine_timeline": {
+      "description": "Vertical timeline component for VAT1-5 and child vaccines",
+      "completed": "border-[#2D7D46] bg-[#2D7D46]/10 text-[#2D7D46]",
+      "pending": "border-slate-300 bg-slate-50 text-slate-500",
+      "overdue": "border-[#D9381E] bg-[#D9381E]/10 text-[#D9381E]"
+    },
+    "alerts": {
+      "urgent": "bg-[#D9381E]/10 text-[#D9381E] border border-[#D9381E]/20 p-4 rounded-lg",
+      "warning": "bg-[#E59500]/10 text-[#E59500] border border-[#E59500]/20 p-4 rounded-lg",
+      "normal": "bg-[#2D7D46]/10 text-[#2D7D46] border border-[#2D7D46]/20 p-4 rounded-lg"
+    }
+  },
+  "icons": {
+    "library": "lucide-react",
+    "usage": "24px for standard UI, 32px-48px for patient portal main actions, 16px for clinical data tables. No emojis allowed."
+  },
+  "media": {
+    "image_urls": [
+      {
+        "url": "https://images.unsplash.com/photo-1649028489371-6e3c36f12ee7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA4Mzl8MHwxfHNlYXJjaHwzfHxhZnJpY2FuJTIwbW90aGVyJTIwYmFieSUyMHNtaWxpbmd8ZW58MHx8fHwxNzc5NDUyODA1fDA&ixlib=rb-4.1.0&q=85",
+        "description": "African mother holding baby smiling",
+        "category": "landing_hero_or_patient_welcome"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1678695972687-033fa0bdbac9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NzV8MHwxfHNlYXJjaHwyfHxibGFjayUyMGRvY3RvciUyMHNtaWxpbmd8ZW58MHx8fHwxNzc5NDUyODE2fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Black female doctor smiling",
+        "category": "professional_portal_welcome_or_landing_credibility"
+      },
+      {
+        "url": "https://images.pexels.com/photos/30688589/pexels-photo-30688589.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Healthcare professional checking patient in clinic in Africa",
+        "category": "landing_mission_section"
+      }
+    ]
+  },
+  "pages": {
+    "landing_page": "Mission focused, highly credible, sober design. Includes Hero with mother & baby image, features cards for the 3 portals, professional credibility markers.",
+    "login_page": "Role selector (Patient vs Pro/Admin). Large friendly tap areas for patients, standard email/password form for pros.",
+    "patient_dashboard": "Mobile-first layout. Large 'Next Appointment' card. Vertical vaccine calendar (mother & child) with clear status colors. Danger signs reminders.",
+    "professional_dashboard": "High-density view. 'Today's Appointments' table, urgent alerts panel (high BP, term passed), fast search bar for patient lookup.",
+    "patient_detail_cpn": "Tabs for Profile, Grossesses, Vaccination, Postnatal, Documents. CPN contact form is a 7-section accordion (general, clinical, biology, prevention, vaccination, education, decision). Sticky 'Save' actions.",
+    "admin_dashboard": "Dense bento grid for 19 KPIs. Recharts (line/bar/donut) for coverage rates. Filters bar stickied at top. CSV Export buttons."
+  },
+  "accessibility": {
+    "contrast": "Ensure all text meets WCAG AA standards. Avoid low contrast gray-on-gray in medical data.",
+    "tap_targets": "Minimum 48x48px on mobile views for patient portal.",
+    "testing": "All interactive and key informational elements MUST include a data-testid attribute (e.g., data-testid='patient-login-button').",
+    "language": "French language UI (default)."
+  },
+  "instructions_to_main_agent": [
+    "Build the application using React (.js files, NOT .tsx).",
+    "Use pure Tailwind CSS and raw HTML tags for layout structures, applying generic components from Shadcn/UI ONLY where interactive logic is needed (e.g., Dialog, Tabs, Accordion).",
+    "Install specific fonts: @fontsource/outfit and @fontsource/manrope.",
+    "Use lucide-react for all icons, no emojis.",
+    "Ensure 'recharts' is installed for Admin dashboard visualizations (Line, Bar, Donut).",
+    "Differentiate UI density strictly based on role: Patient (airy, large text, big touch targets), Pro (dense, tabular, fast data entry), Admin (analytical, complex charts).",
+    "Add data-testid attributes to all buttons, links, form inputs, and key data points."
+  ]
+}
