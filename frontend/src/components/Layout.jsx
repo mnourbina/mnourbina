@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import Logo from "@/components/Logo";
+import LangToggle from "@/components/LangToggle";
 import { LogOut, Menu, X } from "lucide-react";
 
 export default function Layout({ title, nav = [], children, density = "normal" }) {
@@ -39,6 +40,7 @@ export default function Layout({ title, nav = [], children, density = "normal" }
             ))}
           </nav>
           <div className="flex items-center gap-3">
+            <LangToggle />
             {user && (
               <div className="hidden sm:flex flex-col text-right">
                 <span className="text-sm font-semibold leading-tight">{user.name}</span>

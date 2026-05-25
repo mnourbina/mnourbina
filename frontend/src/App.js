@@ -1,9 +1,12 @@
 import "@/App.css";
-import React from "react";
+import React, { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/lib/auth";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import OfflineBanner from "@/components/OfflineBanner";
+import { initNetworkListeners } from "@/lib/network";
+import { applyLanguageOnBoot } from "@/lib/language";
 
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
@@ -19,12 +22,20 @@ import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminUsers from "@/pages/admin/AdminUsers";
 import AdminExports from "@/pages/admin/AdminExports";
 import AdminMpdsr from "@/pages/admin/AdminMpdsr";
+import AdminSync from "@/pages/admin/AdminSync";
 
 function App() {
+  useEffect(() => {
+    applyLanguageOnBoot();
+    const cleanup = initNetworkListeners();
+    return cleanup;
+  }, []);
+
   return (
     <div className="App">
       <AuthProvider>
         <BrowserRouter>
+          <OfflineBanner />
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
@@ -57,6 +68,9 @@ function App() {
             } />
             <Route path="/portail/admin/mpdsr" element={
               <ProtectedRoute roles={["admin"]}><AdminMpdsr /></ProtectedRoute>
+            } />
+            <Route path="/portail/admin/sync" element={
+              <ProtectedRoute roles={["admin"]}><AdminSync /></ProtectedRoute>
             } />
             <Route path="/portail/admin/exports" element={
               <ProtectedRoute roles={["admin"]}><AdminExports /></ProtectedRoute>

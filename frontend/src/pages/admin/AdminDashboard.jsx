@@ -7,6 +7,7 @@ import { Users, HeartPulse, Syringe, AlertTriangle } from "lucide-react";
 const NAV = [
   { to: "/portail/admin", label: "Tableau de bord", end: true },
   { to: "/portail/admin/mpdsr", label: "Audits MPDSR" },
+  { to: "/portail/admin/sync", label: "Synchronisation" },
   { to: "/portail/admin/utilisateurs", label: "Utilisateurs" },
   { to: "/portail/admin/exports", label: "Exports" },
 ];

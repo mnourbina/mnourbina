@@ -29,7 +29,23 @@
 - Typo: Outfit (display) + Manrope (body)
 - Logo: silhouette mere+bebe formant un K, coeur d'or au centre
 
-## What's been implemented (2026-02 & 2026-05)
+## What's been implemented (2026-02, 2026-05 & 2026-05 v3)
+### v3 — Offline-first PWA + Multilingue
+- Zustand store `useNetwork` (online/offline + manual override pour demo)
+- Zustand store `useLanguage` (FR/AR avec direction RTL automatique appliquee sur `<html dir>`)
+- LangToggle dans le header de tous les portails
+- Dexie (IndexedDB) `khalaba_local_v1` avec table `pending` (saisies offline)
+- `smartMutate({endpoint, payload, kind})` — wrapper unifie : online -> API directe, offline -> queue locale
+- `drainQueue()` — vide la file au retour reseau, statut syncing/synced/failed par entree
+- `OfflineBanner` (bandeau Or persistant en offline + bandeau Sable avec compteur + bouton "Synchroniser" en online avec saisies en attente)
+- Auto-drain au retour reseau
+- CPN form utilise `smartMutate` → "Contact CPN enregistre hors-ligne" toast si offline
+- Direct Channel SMS fallback : si offline + canal SMS → `window.location.href = sms:phone?body=...` (ouvre l'app SMS native du telephone) + log local
+- Page admin `/portail/admin/sync` : journal complet des actions en attente, force synchro, retry/delete, simulation reseau (dev toggle)
+- 4 nouvelles dependencies : zustand, dexie
+
+### v1 + v2 (rappel)
+- Auth JWT, Zones+sectorisation+khalaba_id, CPN 1-8 (avec hep B + deparasitage), Postnatal 3 etapes, Newborn, MPDSR, Complications, Direct Channel, Vaccins (mere+enfant), KPIs 19 indicateurs, exports CSV, demo seed enrichi.
 - Auth JWT (login, /me, /admin/users) + 4 roles + RBAC
 - Zones (3 zones TD: N'Djamena, Logone Occidental, Ouaddai) + Facilities (3) + Khalaba-ID unique par patiente
 - Patients CRUD + scoping par zone (cloisonnement)

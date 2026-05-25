@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Link, useParams } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { api, formatApiError } from "@/lib/api";
+import { smartMutate } from "@/lib/syncQueue";
+import { useNetwork } from "@/lib/network";
 import VaccineTimeline from "@/components/VaccineTimeline";
 import { ArrowLeft, Plus, Phone, MapPin, CalendarDays, Activity, AlertTriangle, Heart, X, MessageCircle, PhoneCall, Baby, AlertOctagon, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
@@ -468,7 +470,7 @@ export default function PatientDetail() {
         <DeathAuditModal patientId={id} pregnancyId={activePreg?.id} onClose={() => setShowDeathModal(false)} onSaved={() => { setShowDeathModal(false); reload(); toast.success("Deces declare — audit MPDSR a planifier"); }} />
       )}
       {showChannelModal && (
-        <DirectChannelModal patientId={id} onClose={() => setShowChannelModal(false)} onSaved={() => { setShowChannelModal(false); reload(); toast.success("Action canal direct enregistree"); }} />
+        <DirectChannelModal patientId={id} patientPhone={patient?.phone} onClose={() => setShowChannelModal(false)} onSaved={() => { setShowChannelModal(false); reload(); toast.success("Action canal direct enregistree"); }} />
       )}
     </Layout>
   );
@@ -567,7 +569,10 @@ function CpnFormModal({ pregnancy, nextContactNumber, onClose, onSaved }) {
       });
       payload.contact_number = Number(form.contact_number);
       if (!payload.next_appointment) delete payload.next_appointment;
-      await api.post("/cpn", payload);
+      const res = await smartMutate({ endpoint: "/cpn", method: "POST", payload, kind: "CPN" });
+      if (res?.__queued) {
+        toast.success("Contact CPN enregistre hors-ligne. Synchronisation auto au retour du reseau.");
+      }
       onSaved();
     } catch (err) {
       toast.error(formatApiError(err));
@@ -829,21 +834,39 @@ function DeathAuditModal({ patientId, pregnancyId, onClose, onSaved }) {
   );
 }
 
-function DirectChannelModal({ patientId, onClose, onSaved }) {
+function DirectChannelModal({ patientId, patientPhone, onClose, onSaved }) {
   const [form, setForm] = useState({
     patient_id: patientId, channel: "call", direction: "pro_to_patient",
     purpose: "confirm_appointment", notes: "",
   });
   const [busy, setBusy] = useState(false);
+  const isOnline = useNetwork((s) => s.isOnline);
+
   const submit = async (e) => {
     e.preventDefault(); setBusy(true);
-    try { await api.post("/direct-channel", form); onSaved(); }
-    catch (err) { toast.error(formatApiError(err)); } finally { setBusy(false); }
+    try {
+      // SMS offline-first behaviour: if offline + channel=sms, open native sms: URI
+      if (form.channel === "sms" && !isOnline && patientPhone) {
+        const body = form.notes || (form.purpose === "confirm_appointment" ? "Bonjour, je confirme votre rendez-vous au centre de sante." : "");
+        const sanitized = encodeURIComponent(body);
+        // sms: URI spec: sms:phone?body=...
+        window.location.href = `sms:${patientPhone}?body=${sanitized}`;
+      }
+      // In all cases, log the exchange (queued offline, sent online)
+      const res = await smartMutate({ endpoint: "/direct-channel", method: "POST", payload: form, kind: "Canal direct" });
+      if (res?.__queued) toast.success("Echange logue hors-ligne. Synchronisation au retour du reseau.");
+      onSaved();
+    } catch (err) { toast.error(formatApiError(err)); } finally { setBusy(false); }
   };
   return (
     <ModalShell title="Canal direct sage-femme / patiente" onClose={onClose}>
       <form onSubmit={submit} className="p-5 space-y-4">
         <p className="text-sm text-muted-foreground">Tracez l'echange avec la patiente : confirmation de RDV, demande de decalage, conseil medical, signalement de signe de danger.</p>
+        {!isOnline && form.channel === "sms" && (
+          <div className="text-xs px-3 py-2 rounded bg-[#FFB300]/15 text-foreground border border-[#FFB300]/40">
+            Mode hors-ligne : l'envoi va ouvrir l'application SMS native de votre telephone. L'echange est tout de meme journalise localement.
+          </div>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Select label="Canal" value={form.channel} onChange={v => setForm({ ...form, channel: v })} options={["call", "sms", "in_app"]} testid="ch-channel" />
           <Select label="Direction" value={form.direction} onChange={v => setForm({ ...form, direction: v })} options={["pro_to_patient", "patient_to_pro"]} testid="ch-direction" />
