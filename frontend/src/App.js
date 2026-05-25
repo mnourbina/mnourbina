@@ -1,52 +1,72 @@
-import { useEffect } from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
+import React from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "sonner";
+import { AuthProvider } from "@/lib/auth";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+import Landing from "@/pages/Landing";
+import Login from "@/pages/Login";
 
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
+import PatientDashboard from "@/pages/patient/PatientDashboard";
+import PatientVaccines from "@/pages/patient/PatientVaccines";
 
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
+import ProDashboard from "@/pages/pro/ProDashboard";
+import PatientsList from "@/pages/pro/PatientsList";
+import PatientDetail from "@/pages/pro/PatientDetail";
 
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
-};
+import AdminDashboard from "@/pages/admin/AdminDashboard";
+import AdminUsers from "@/pages/admin/AdminUsers";
+import AdminExports from "@/pages/admin/AdminExports";
+import AdminMpdsr from "@/pages/admin/AdminMpdsr";
 
 function App() {
   return (
     <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+
+            {/* Patient portal */}
+            <Route path="/portail/patiente" element={
+              <ProtectedRoute roles={["patient"]}><PatientDashboard /></ProtectedRoute>
+            } />
+            <Route path="/portail/patiente/vaccins" element={
+              <ProtectedRoute roles={["patient"]}><PatientVaccines /></ProtectedRoute>
+            } />
+
+            {/* Professional portal */}
+            <Route path="/portail/pro" element={
+              <ProtectedRoute roles={["midwife", "gynecologist"]}><ProDashboard /></ProtectedRoute>
+            } />
+            <Route path="/portail/pro/patientes" element={
+              <ProtectedRoute roles={["midwife", "gynecologist"]}><PatientsList /></ProtectedRoute>
+            } />
+            <Route path="/portail/pro/patientes/:id" element={
+              <ProtectedRoute roles={["midwife", "gynecologist", "admin"]}><PatientDetail /></ProtectedRoute>
+            } />
+
+            {/* Admin portal */}
+            <Route path="/portail/admin" element={
+              <ProtectedRoute roles={["admin"]}><AdminDashboard /></ProtectedRoute>
+            } />
+            <Route path="/portail/admin/utilisateurs" element={
+              <ProtectedRoute roles={["admin"]}><AdminUsers /></ProtectedRoute>
+            } />
+            <Route path="/portail/admin/mpdsr" element={
+              <ProtectedRoute roles={["admin"]}><AdminMpdsr /></ProtectedRoute>
+            } />
+            <Route path="/portail/admin/exports" element={
+              <ProtectedRoute roles={["admin"]}><AdminExports /></ProtectedRoute>
+            } />
+
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+        <Toaster position="top-right" richColors closeButton />
+      </AuthProvider>
     </div>
   );
 }
