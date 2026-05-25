@@ -437,6 +437,11 @@ export default function PatientDetail() {
                       <p className="font-medium">{l.purpose.replace("_", " ")}</p>
                       {l.notes && <p className="text-xs text-muted-foreground">{l.notes}</p>}
                     </div>
+                    {l.channel === "sms" && l.sms_status && l.sms_status !== "not_applicable" && (
+                      <span className={`text-xs px-2 py-0.5 rounded font-semibold ${l.sms_status === "sent" || l.sms_status === "delivered" ? "bg-[#2D7D46]/10 text-[#2D7D46]" : "bg-destructive/10 text-destructive"}`} title={l.sms_provider || ""}>
+                        SMS {l.sms_status}
+                      </span>
+                    )}
                     <span className="text-xs text-muted-foreground">{new Date(l.created_at).toLocaleString("fr-FR")}</span>
                   </div>
                 ))}

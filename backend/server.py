@@ -356,6 +356,9 @@ class DirectChannelLogOut(DirectChannelLogIn):
     id: str
     user_id: str
     created_at: datetime
+    sms_status: Optional[Literal["sent", "delivered", "failed", "not_applicable"]] = None
+    sms_provider: Optional[str] = None
+    sms_message_id: Optional[str] = None
 
 
 class DashboardKpis(BaseModel):
@@ -1082,12 +1085,54 @@ async def update_death_audit(audit_id: str, payload: DeathAuditUpdateIn, user: d
 # ---------------------------------------------------------------------------
 # Endpoints: Direct channel logs (sage-femme <-> patiente)
 # ---------------------------------------------------------------------------
+SMS_TEMPLATES = {
+    "confirm_appointment": "Bonjour {name}, votre rendez-vous CPN avec la sage-femme de {facility} est prevu prochainement. En cas d'empechement, repondez 1 pour decaler. Khalaba.",
+    "reschedule_request": "Bonjour {name}, votre demande de report de rendez-vous a ete enregistree. Une sage-femme vous rappellera. Khalaba.",
+    "advice": "Bonjour {name}, message de votre sage-femme : {notes}. Khalaba.",
+    "danger_report": "URGENT - {name} : si vous ressentez un signe de danger, allez immediatement au centre de sante le plus proche. Khalaba.",
+    "other": "Bonjour {name}, message de votre sage-femme. Khalaba.",
+}
+
+
+async def mock_send_sms(patient: dict, purpose: str, notes: Optional[str]) -> dict:
+    """Mock SMS gateway (Scenario A). In production, swap with Twilio/Infobip call."""
+    template = SMS_TEMPLATES.get(purpose, SMS_TEMPLATES["other"])
+    facility = None
+    if patient.get("facility_id"):
+        facility = await db.facilities.find_one({"id": patient["facility_id"]}, {"_id": 0, "name": 1})
+    body = template.format(
+        name=patient.get("first_name", "Madame"),
+        facility=(facility or {}).get("name", "votre structure"),
+        notes=(notes or "").strip()[:120],
+    )
+    msg_id = f"khalaba-mock-{new_id()[:8]}"
+    logger.info("[MOCK SMS] -> %s | %s", patient.get("phone"), body)
+    return {"status": "sent", "provider": "khalaba-mock-gateway", "message_id": msg_id}
+
+
 @api.post("/direct-channel", response_model=DirectChannelLogOut)
 async def log_direct_channel(payload: DirectChannelLogIn, user: dict = Depends(get_current_user)):
+    sms_status: Optional[str] = "not_applicable"
+    sms_provider: Optional[str] = None
+    sms_message_id: Optional[str] = None
+
+    if payload.channel == "sms" and payload.direction == "pro_to_patient":
+        patient = await db.patients.find_one({"id": payload.patient_id}, {"_id": 0})
+        if patient and patient.get("phone"):
+            res = await mock_send_sms(patient, payload.purpose, payload.notes)
+            sms_status = res["status"]
+            sms_provider = res["provider"]
+            sms_message_id = res["message_id"]
+        else:
+            sms_status = "failed"
+
     doc = {
         "id": new_id(),
         "user_id": user["id"],
         **payload.model_dump(),
+        "sms_status": sms_status,
+        "sms_provider": sms_provider,
+        "sms_message_id": sms_message_id,
         "created_at": now_utc().isoformat(),
     }
     await db.direct_channel.insert_one(doc)

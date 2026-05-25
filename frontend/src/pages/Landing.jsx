@@ -6,7 +6,6 @@ import {
   BarChart3, Syringe, WifiOff, MapPin, PhoneCall, AlertOctagon
 } from "lucide-react";
 
-const heroImg = "https://images.unsplash.com/photo-1649028489371-6e3c36f12ee7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA4Mzl8MHwxfHNlYXJjaHwzfHxhZnJpY2FuJTIwbW90aGVyJTIwYmFieSUyMHNtaWxpbmd8ZW58MHx8fHwxNzc5NDUyODA1fDA&ixlib=rb-4.1.0&q=85";
 const fieldImg = "https://images.pexels.com/photos/30688589/pexels-photo-30688589.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940";
 
 export default function Landing() {
@@ -30,7 +29,7 @@ export default function Landing() {
         <div className="grid lg:grid-cols-12 gap-10 items-center">
           <div className="lg:col-span-7">
             <span className="inline-block text-xs font-bold uppercase tracking-widest text-primary mb-5" data-testid="landing-overline">
-              Plateforme Khalaba · Tchad & Afrique subsaharienne
+              Plateforme souveraine de sante maternelle et infantile · Tchad
             </span>
             <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold leading-[1.05] text-balance text-foreground">
               Briser les courbes de mortalite, <span className="text-primary">au dernier kilometre.</span>
@@ -39,7 +38,25 @@ export default function Landing() {
               Suivi prenatal complet (8 CPN OMS), postnatal en 3 etapes (6h, 6j, 6s), carnet vaccinal jumele mere-enfant, audit des deces (MPDSR), zones de responsabilite cloisonnees.
               Une seule plateforme — pensee par un ancien Medecin Chef de District — pour les sages-femmes, les gynecologues, l'administration sanitaire et les patientes.
             </p>
-            <div className="mt-8 flex flex-col sm:flex-row gap-3">
+
+            {/* 4 mots-cles brand */}
+            <ul className="mt-7 flex flex-wrap gap-2" data-testid="landing-keywords">
+              {[
+                { label: "Offline-First", tone: "primary" },
+                { label: "Suivi CPN OMS", tone: "primary" },
+                { label: "Vaccins & DHIS2", tone: "primary" },
+                { label: "Alertes Vitales", tone: "gold" },
+              ].map((k) => (
+                <li
+                  key={k.label}
+                  className={`text-xs font-bold uppercase tracking-wider px-3 py-1.5 rounded-full ${k.tone === "gold" ? "bg-[#FFB300]/15 text-[#7a5400] border border-[#FFB300]/40" : "bg-primary/10 text-primary border border-primary/20"}`}
+                >
+                  {k.label}
+                </li>
+              ))}
+            </ul>
+
+            <div className="mt-7 flex flex-col sm:flex-row gap-3">
               <Link to="/login" data-testid="landing-cta-primary" className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors">
                 Acceder a mon portail <ArrowRight size={18} />
               </Link>
@@ -63,7 +80,10 @@ export default function Landing() {
           </div>
           <div className="lg:col-span-5">
             <div className="relative">
-              <img src={heroImg} alt="Mere et enfant" className="w-full aspect-[4/5] object-cover rounded-3xl shadow-xl" />
+              {/* Official Khalaba artwork - mother + baby + golden heart */}
+              <div className="aspect-[4/5] rounded-3xl bg-gradient-to-br from-[#F9F5F0] via-[#FDF6EB] to-[#F2E9DB] border border-border shadow-xl flex items-center justify-center p-8" data-testid="landing-brand-art">
+                <img src="/khalaba-logo.png" alt="Khalaba — mere et enfant" className="max-w-full max-h-full object-contain" />
+              </div>
               <div className="absolute -bottom-5 -left-5 bg-white rounded-2xl shadow-lg p-4 border border-border max-w-[260px]" data-testid="landing-stat-card">
                 <div className="flex items-center gap-2 text-xs font-semibold text-[#FFB300] mb-1"><Sprout size={14} className="text-[#2D7D46]" /> Donnees souveraines</div>
                 <p className="text-sm text-foreground leading-snug">Heberge sur infrastructure controlee, chiffree au repos. Cloisonnement par zone de responsabilite.</p>
