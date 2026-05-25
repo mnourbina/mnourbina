@@ -93,6 +93,7 @@ class UserPublic(BaseModel):
     name: str
     role: Role
     facility_id: Optional[str] = None
+    zone_id: Optional[str] = None
     patient_id: Optional[str] = None  # link to Patient doc if role=patient
     created_at: datetime
 
