@@ -369,8 +369,8 @@ export default function PatientDetail() {
                   </div>
                   {v.alerts?.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {v.alerts.map((a, idx) => (
-                        <span key={idx} className="text-xs px-2 py-0.5 rounded bg-destructive/10 text-destructive">{a}</span>
+                      {v.alerts.map((a) => (
+                        <span key={`${v.id}-${a}`} className="text-xs px-2 py-0.5 rounded bg-destructive/10 text-destructive">{a}</span>
                       ))}
                     </div>
                   )}

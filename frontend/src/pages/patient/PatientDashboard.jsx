@@ -48,7 +48,7 @@ export default function PatientDashboard() {
           if (last?.next_appointment) setNextCpn(last.next_appointment);
         }
       } catch (e) {
-        // silent
+        console.error("PatientDashboard load error:", e);
       } finally {
         if (active) setLoading(false);
       }
