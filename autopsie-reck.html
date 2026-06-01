@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AUTOPSIE RECK</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .form-section { border-left: 4px solid #3b82f6; }
+        .form-section h3 { color: #1e40af; }
+        .field-group { margin-bottom: 1rem; position: relative; }
+        .field-group label { display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.25rem; }
+        .field-group input, .field-group select, .field-group textarea {
+            width: 100%; padding: 0.5rem; padding-right: 2.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; font-size: 0.875rem;
+            transition: border-color 0.2s;
+        }
+        .field-group input:focus, .field-group select:focus, .field-group textarea:focus {
+            outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        .mic-btn {
+            position: absolute; right: 0.5rem; top: 1.75rem; width: 32px; height: 32px;
+            background: #e5e7eb; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.2s; border: none; padding: 0;
+        }
+        .mic-btn:hover { background: #d1d5db; transform: scale(1.05); }
+        .mic-btn.active { background: #ef4444; animation: pulse 1.5s infinite; }
+        .mic-btn.active svg { fill: white; }
+        .mic-btn svg { width: 16px; height: 16px; fill: #6b7280; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+        .voice-status { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #ef4444; color: white; padding: 0.75rem 1.5rem; border-radius: 9999px; z-index: 100; display: none; align-items: center; gap: 0.5rem; font-weight: 500; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .voice-status.show { display: flex; }
+        .voice-status .dot { width: 8px; height: 8px; background: white; border-radius: 50%; animation: blink 1s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .card { background: white; border-radius: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 1rem; margin-bottom: 1rem; }
+        .toggle-switch { position: relative; display: inline-block; width: 40px; height: 24px; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #2563eb; }
+        input:checked + .slider:before { transform: translateX(16px); }
+        .hidden-section { display: none; }
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 0.75rem 1.5rem; border-radius: 0.5rem; z-index: 100; animation: slideUp 0.3s ease; }
+        @keyframes slideUp { from { transform: translate(-50%, 100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+        .photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+        .photo-item { position: relative; border-radius: 0.5rem; overflow: hidden; aspect-ratio: 4/3; }
+        .photo-item img { width: 100%; height: 100%; object-fit: cover; }
+        .photo-delete { position: absolute; top: 0.25rem; right: 0.25rem; background: rgba(239,68,68,0.9); color: white; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; font-size: 14px; }
+        .photo-caption { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); color: white; padding: 0.25rem 0.5rem; font-size: 0.7rem; }
+        .photo-add { border: 2px dashed #d1d5db; border-radius: 0.5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; min-height: 120px; background: #f9fafb; transition: all 0.2s; }
+        .photo-add:hover { border-color: #3b82f6; background: #eff6ff; }
+        .photo-add svg { width: 32px; height: 32px; color: #9ca3af; }
+        .photo-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 200; display: none; align-items: center; justify-content: center; }
+        .photo-modal.show { display: flex; }
+        .photo-modal img { max-width: 90%; max-height: 80vh; object-fit: contain; }
+        .photo-modal-close { position: absolute; top: 1rem; right: 1rem; color: white; font-size: 2rem; cursor: pointer; background: none; border: none; }
+        .camera-preview { width: 100%; max-width: 400px; }
+        .section-photos-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+    </style>
+</head>
+<body class="text-gray-800">
+
+<div id="voice-status" class="voice-status">
+    <div class="dot"></div>
+    <span>🎤 Écoute en cours...</span>
+</div>
+
+<div id="photo-modal" class="photo-modal" onclick="closePhotoModal()">
+    <button class="photo-modal-close">&times;</button>
+    <img id="modal-photo-img" src="" alt="">
+</div>
+
+<div id="camera-modal" class="photo-modal" style="background: rgba(0,0,0,0.95);">
+    <div class="flex flex-col items-center gap-4 p-4">
+        <button onclick="closeCamera()" class="text-white text-lg self-start">&times; Fermer</button>
+        <video id="camera-video" class="camera-preview rounded-lg" autoplay playsinline></video>
+        <canvas id="camera-canvas" class="hidden"></canvas>
+        <div class="flex gap-4">
+            <button onclick="capturePhoto()" class="bg-blue-600 text-white px-6 py-3 rounded-full font-bold hover:bg-blue-700 flex items-center gap-2">
+                📸 Capturer
+            </button>
+        </div>
+        <p class="text-gray-400 text-sm">Pointez la caméra vers la zone à photographier</p>
+    </div>
+</div>
+
+<div class="max-w-2xl mx-auto bg-white min-h-screen shadow-lg">
+    <header class="bg-blue-800 text-white p-4 sticky top-0 z-20 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-blue-800 font-bold text-lg">A</div>
+            <div>
+                <h1 class="font-bold text-lg leading-tight">AUTOPSIE RECK</h1>
+                <p class="text-xs opacity-80">Dossier Médico-Légal</p>
+            </div>
+        </div>
+        <button onclick="showDashboard()" class="text-sm bg-blue-700 px-3 py-1.5 rounded hover:bg-blue-600">
+            Accueil
+        </button>
+    </header>
+
+    <div id="dashboard-view" class="p-4">
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="bg-blue-50 p-4 rounded-xl text-center">
+                <div class="text-3xl font-bold text-blue-800" id="stat-count">0</div>
+                <div class="text-sm text-blue-600">Dossiers</div>
+            </div>
+            <div class="bg-green-50 p-4 rounded-xl text-center">
+                <div class="text-3xl font-bold text-green-800" id="stat-drafts">0</div>
+                <div class="text-sm text-green-600">Brouillons</div>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-bold text-gray-800">Dossiers récents</h2>
+            <button onclick="newDraft()" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                Nouveau
+            </button>
+        </div>
+
+        <div id="drafts-list" class="space-y-3">
+            <div class="text-center text-gray-400 py-12">
+                <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                <p>Aucun dossier pour le moment</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="form-view" class="hidden">
+        <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+            <button onclick="showDashboard()" class="text-gray-600 flex items-center gap-1">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                Retour
+            </button>
+            <span class="font-bold text-gray-800" id="form-title">Nouveau Dossier</span>
+            <div class="flex gap-2">
+                <button onclick="saveDraft()" class="text-blue-600 text-sm font-medium">Sauver</button>
+            </div>
+        </div>
+
+        <div class="p-4 space-y-4 pb-24">
+            <div class="card">
+                <label class="block text-sm font-medium text-gray-700 mb-3">Type de cas</label>
+                <div class="grid grid-cols-4 gap-2">
+                    <button onclick="selectCaseType('violent')" class="case-type-btn p-2 border-2 border-gray-200 rounded-lg text-center text-xs hover:border-blue-500" data-type="violent">
+                        🔪 Violent
+                    </button>
+                    <button onclick="selectCaseType('natural')" class="case-type-btn p-2 border-2 border-gray-200 rounded-lg text-center text-xs hover:border-green-500" data-type="natural">
+                        🏥 Naturel
+                    </button>
+                    <button onclick="selectCaseType('pediatric')" class="case-type-btn p-2 border-2 border-gray-200 rounded-lg text-center text-xs hover:border-orange-500" data-type="pediatric">
+                        👶 Pédiatrique
+                    </button>
+                    <button onclick="selectCaseType('suspicious')" class="case-type-btn p-2 border-2 border-gray-200 rounded-lg text-center text-xs hover:border-amber-500" data-type="suspicious">
+                        ❓ Suspect
+                    </button>
+                </div>
+            </div>
+
+            <div id="sections-container" class="space-y-4"></div>
+
+            <div class="flex gap-3 pt-4">
+                <button onclick="exportToWord()" class="flex-1 bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    Export Word
+                </button>
+                <button onclick="saveAndClose()" class="px-4 bg-gray-200 text-gray-700 py-3 rounded-lg font-medium hover:bg-gray-300">
+                    Fermer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const sectionsConfig = {
+    admin: {
+        id: 'admin', title: '1. Informations Administratives', icon: '📋', required: true, allowPhotos: false,
+        fields: [
+            { id: 'dossier_id', label: 'Numéro de dossier', type: 'text' },
+            { id: 'autopsy_date', label: 'Date de l\'autopsie', type: 'date' },
+            { id: 'autopsy_time', label: 'Heure de l\'autopsie', type: 'time' },
+            { id: 'autopsy_place', label: 'Lieu de l\'autopsie', type: 'text' },
+            { id: 'req_number', label: 'Numéro de réquisition', type: 'text' },
+            { id: 'authority', label: 'Autorité requérante', type: 'text' },
+            { id: 'expert_name', label: 'Nom du médecin expert', type: 'text' },
+            { id: 'tech_name', label: 'Nom du technicien', type: 'text' }
+        ]
+    },
+    identity: {
+        id: 'identity', title: '2. Identification du Défunt', icon: '👤', required: true, allowPhotos: false,
+        fields: [
+            { id: 'last_name', label: 'Nom complet', type: 'text' },
+            { id: 'first_name', label: 'Prénom(s)', type: 'text' },
+            { id: 'dob', label: 'Date de naissance', type: 'date' },
+            { id: 'age', label: 'Âge', type: 'number', readonly: true },
+            { id: 'sex', label: 'Sexe', type: 'select', options: ['Masculin', 'Féminin', 'Indéterminé'] },
+            { id: 'profession', label: 'Profession', type: 'text' },
+            { id: 'civil_status', label: 'État civil', type: 'select', options: ['Célibataire', 'Marié(e)', 'Divorcé(e)', 'Veuf/Veuve'] },
+            { id: 'address', label: 'Adresse complète', type: 'textarea' },
+            { id: 'father_name', label: 'Nom du père', type: 'text' },
+            { id: 'mother_name', label: 'Nom de la mère', type: 'text' },
+            { id: 'family_phone', label: 'Téléphone famille', type: 'tel' }
+        ]
+    },
+    circumstances: {
+        id: 'circumstances', title: '3. Historique et Circonstances', icon: '📅', required: true, allowPhotos: true, photoLabel: 'Photos de la scène / circonstances',
+        fields: [
+            { id: 'death_date', label: 'Date du décès', type: 'date' },
+            { id: 'death_time', label: 'Heure du décès', type: 'time' },
+            { id: 'death_place', label: 'Lieu du décès', type: 'select', options: ['Domicile', 'Voie publique', 'Hôpital', 'Autre'] },
+            { id: 'hospitalized', label: 'Hospitalisation', type: 'select', options: ['Oui', 'Non'] },
+            { id: 'medical_history', label: 'Antécédents médicaux', type: 'textarea' },
+            { id: 'social_history', label: 'Histoire sociale', type: 'textarea' },
+            { id: 'discovery_circumstances', label: 'Circonstances de la découverte', type: 'textarea' }
+        ]
+    },
+    external: {
+        id: 'external', title: '4. Examen Externe', icon: '🔍', required: true, allowPhotos: true, photoLabel: 'Photos examen externe (corps entier, lésions visibles)',
+        fields: [
+            { id: 'body_weight', label: 'Poids du corps (kg)', type: 'number' },
+            { id: 'body_height', label: 'Taille (cm)', type: 'number' },
+            { id: 'nutritional_status', label: 'État nutritionnel', type: 'select', options: ['Normal', 'Dénutrition', 'Obésité'] },
+            { id: 'clothing_desc', label: 'Description des vêtements', type: 'textarea' },
+            { id: 'rigor_mortis', label: 'Rigor mortis', type: 'select', options: ['Présent', 'Absent', 'En diminution'] },
+            { id: 'livor_mortis', label: 'Livor mortis', type: 'select', options: ['Fixe', 'Non fixe', 'Absent'] },
+            { id: 'decomp_stage', label: 'Stade de décomposition', type: 'text' },
+            { id: 'hair_color', label: 'Couleur des cheveux', type: 'text' },
+            { id: 'dental_status', label: 'État dentaire', type: 'textarea' },
+            { id: 'tattoos', label: 'Tatouages', type: 'textarea' },
+            { id: 'scars', label: 'Cicatrices', type: 'textarea' }
+        ]
+    },
+    injuries: {
+        id: 'injuries', title: '5. Lésions et Traumatismes', icon: '🩸', required: false, allowPhotos: true, photoLabel: 'Photos détaillées des lésions (avec échelle)',
+        fields: [
+            { id: 'firearm_injuries', label: 'Traumatismes par arme à feu', type: 'textarea' },
+            { id: 'sharp_force_injuries', label: 'Traumatismes par arme blanche', type: 'textarea' },
+            { id: 'blunt_force_injuries', label: 'Traumatismes par force contondante', type: 'textarea' },
+            { id: 'burns', label: 'Brûlures', type: 'textarea' },
+            { id: 'strangulation', label: 'Strangulation/suffocation', type: 'textarea' },
+            { id: 'drowning', label: 'Noyade', type: 'textarea' }
+        ]
+    },
+    internal: {
+        id: 'internal', title: '6. Examen Interne', icon: '🫀', required: true, allowPhotos: true, photoLabel: 'Photos des organes (coupes, lésions internes)',
+        fields: [
+            { id: 'incision_type', label: 'Type d\'incision', type: 'select', options: ['En Y', 'En I', 'Autre'] },
+            { id: 'evisceration_method', label: 'Méthode d\'éviscération', type: 'select', options: ['Letulle', 'Virchow', 'Ghon', 'Rokitansky'] },
+            { id: 'brain_weight', label: 'Cerveau (g)', type: 'number' },
+            { id: 'heart_weight', label: 'Cœur (g)', type: 'number' },
+            { id: 'right_lung_weight', label: 'Poumon droit (g)', type: 'number' },
+            { id: 'left_lung_weight', label: 'Poumon gauche (g)', type: 'number' },
+            { id: 'lungs_findings', label: 'Poumons (observations)', type: 'textarea' },
+            { id: 'liver_weight', label: 'Foie (g)', type: 'number' },
+            { id: 'liver_findings', label: 'Foie (observations)', type: 'textarea' },
+            { id: 'spleen_weight', label: 'Rate (g)', type: 'number' },
+            { id: 'right_kidney_weight', label: 'Rein droit (g)', type: 'number' },
+            { id: 'left_kidney_weight', label: 'Rein gauche (g)', type: 'number' },
+            { id: 'stomach_content', label: 'Contenu gastrique', type: 'textarea' }
+        ]
+    },
+    ancillary: {
+        id: 'ancillary', title: '7. Procédures Ancillaires', icon: '🔬', required: false, allowPhotos: false,
+        fields: [
+            { id: 'imaging', label: 'Imagerie post-mortem', type: 'textarea' },
+            { id: 'histology', label: 'Histologie', type: 'textarea' },
+            { id: 'microbiology', label: 'Microbiologie', type: 'textarea' },
+            { id: 'toxicology', label: 'Toxicologie', type: 'textarea' }
+        ]
+    },
+    conclusion: {
+        id: 'conclusion', title: '8. Synthèse et Conclusions', icon: '📝', required: true, allowPhotos: false,
+        fields: [
+            { id: 'diagnosis_1', label: 'Diagnostic 1', type: 'textarea' },
+            { id: 'diagnosis_2', label: 'Diagnostic 2', type: 'textarea' },
+            { id: 'immediate_cause', label: 'Cause immédiate du décès', type: 'textarea' },
+            { id: 'legal_cause', label: 'Cause du décès (formulation finale)', type: 'textarea' },
+            { id: 'manner', label: 'Manière du décès', type: 'select', options: ['Naturelle', 'Accident', 'Suicide', 'Homicide', 'Indéterminé'] },
+            { id: 'comments', label: 'Commentaires', type: 'textarea' }
+        ]
+    },
+    validation: {
+        id: 'validation', title: '9. Validation', icon: '✍️', required: true, allowPhotos: false,
+        fields: [
+            { id: 'expert_signature', label: 'Signature du médecin', type: 'text' },
+            { id: 'expert_title', label: 'Titre/Qualification', type: 'text' },
+            { id: 'signature_date', label: 'Date de signature', type: 'date' }
+        ]
+    }
+};
+
+let currentDraft = {};
+let selectedCaseType = '';
+let recognition = null;
+let activeMicBtn = null;
+let voiceSessionId = 0;
+let currentPhotoSection = null;
+let cameraStream = null;
+const draftsCache = {};
+let initialFieldValue = '';
+
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+}
+
+function micSvg() {
+    return '<svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/></svg>';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadDraftsList();
+    initSpeechRecognition();
+});
+
+function initSpeechRecognition() {
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) return;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.lang = 'fr-FR';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+
+    recognition.onresult = (event) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+        }
+        if (activeMicBtn) {
+            const field = document.getElementById(activeMicBtn.dataset.fieldId);
+            if (field) {
+                if (field.tagName === 'SELECT') {
+                    const match = Array.from(field.options).map(o => o.value)
+                        .find(o => o.toLowerCase().includes(transcript.toLowerCase()));
+                    if (match) field.value = match;
+                } else {
+                    field.value = initialFieldValue + transcript;
+                    if (event.results[event.results.length - 1].isFinal) {
+                        field.dispatchEvent(new Event('input'));
+                    }
+                }
+            }
+        }
+    };
+
+    recognition.onerror = (event) => {
+        stopListening();
+        if (event.error === 'not-allowed') showToast('🎤 Microphone non autorisé');
+        else showToast('❌ Erreur: ' + event.error);
+    };
+}
+
+function startListening(btn) {
+    if (!recognition) { showToast('❌ Reconnaissance vocale non supportée'); return; }
+
+    if (activeMicBtn === btn) {
+        stopListening();
+        try { recognition.abort(); } catch (e) {}
+        return;
+    }
+
+    voiceSessionId++;
+    const mySessionId = voiceSessionId;
+
+    if (activeMicBtn && activeMicBtn !== btn) {
+        activeMicBtn.classList.remove('active');
+        activeMicBtn.innerHTML = micSvg();
+    }
+
+    activeMicBtn = btn;
+    btn.classList.add('active');
+    btn.innerHTML = micSvg();
+    document.getElementById('voice-status').classList.add('show');
+
+    const field = document.getElementById(btn.dataset.fieldId);
+    initialFieldValue = field && field.tagName !== 'SELECT' ? field.value : '';
+    if (initialFieldValue && !initialFieldValue.endsWith(' ')) initialFieldValue += ' ';
+
+    recognition.onend = () => {
+        if (voiceSessionId === mySessionId) stopListening();
+    };
+
+    try { recognition.abort(); } catch (e) {}
+    setTimeout(() => {
+        try { recognition.start(); } catch (e) { stopListening(); }
+    }, 50);
+}
+
+function stopListening() {
+    if (activeMicBtn) {
+        activeMicBtn.classList.remove('active');
+        activeMicBtn.innerHTML = micSvg();
+        activeMicBtn = null;
+    }
+    document.getElementById('voice-status').classList.remove('show');
+}
+
+function calculateAge(dob) {
+    const ageField = document.getElementById('field-age');
+    if (!ageField) return;
+    if (!dob) { ageField.value = ''; return; }
+    const birth = new Date(dob);
+    if (isNaN(birth.getTime())) { ageField.value = ''; return; }
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    ageField.value = age >= 0 ? age : 0;
+}
+
+function openCamera(sectionId) {
+    currentPhotoSection = sectionId;
+    document.getElementById('camera-modal').classList.add('show');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showToast('❌ Caméra non supportée ou protocole non sécurisé (HTTPS requis)');
+        closeCamera();
+        return;
+    }
+    const video = document.getElementById('camera-video');
+    navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+    }).then(stream => {
+        cameraStream = stream;
+        video.srcObject = stream;
+    }).catch(() => {
+        showToast('❌ Impossible d\'accéder à la caméra');
+        closeCamera();
+    });
+}
+
+function closeCamera() {
+    document.getElementById('camera-modal').classList.remove('show');
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        cameraStream = null;
+    }
+}
+
+function capturePhoto() {
+    const video = document.getElementById('camera-video');
+    const canvas = document.getElementById('camera-canvas');
+    const maxDim = 1024;
+    let w = video.videoWidth || 1280;
+    let h = video.videoHeight || 720;
+    if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else { w = Math.round(w * maxDim / h); h = maxDim; }
+    }
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+    const imageData = canvas.toDataURL('image/jpeg', 0.7);
+    if (!currentDraft.photos) currentDraft.photos = {};
+    if (!currentDraft.photos[currentPhotoSection]) currentDraft.photos[currentPhotoSection] = [];
+    currentDraft.photos[currentPhotoSection].push({ data: imageData, timestamp: new Date().toISOString(), caption: '' });
+    showToast('📸 Photo capturée !');
+    closeCamera();
+    renderPhotoSection(currentPhotoSection);
+}
+
+function renderPhotoSection(sectionId) {
+    const sectionDiv = document.querySelector(`[data-section-id="${sectionId}"]`);
+    if (!sectionDiv) return;
+    const config = sectionsConfig[sectionId];
+    if (!config.allowPhotos) return;
+
+    let photoContainer = sectionDiv.querySelector('.photo-section');
+    if (!photoContainer) {
+        photoContainer = document.createElement('div');
+        photoContainer.className = 'photo-section mt-4 pt-4 border-t';
+        sectionDiv.querySelector('[id^="fields-"]').after(photoContainer);
+    }
+
+    const photos = currentDraft.photos?.[sectionId] || [];
+    photoContainer.innerHTML = `
+        <div class="section-photos-header">
+            <h4 class="font-medium text-gray-700 flex items-center gap-2">
+                📸 ${escapeHtml(config.photoLabel || 'Photos')}
+                <span class="text-xs bg-gray-100 px-2 py-0.5 rounded">${photos.length}</span>
+            </h4>
+            <button onclick="openCamera('${sectionId}')" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm flex items-center gap-1 hover:bg-blue-700">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                Ajouter photo
+            </button>
+        </div>
+        <div class="photo-grid">
+            ${photos.map((photo, idx) => `
+                <div class="photo-item" onclick="viewPhoto('${sectionId}', ${idx})">
+                    <img src="${photo.data}" alt="Photo ${idx + 1}">
+                    <button class="photo-delete" onclick="event.stopPropagation(); deletePhoto('${sectionId}', ${idx})">×</button>
+                    <div class="photo-caption">Photo ${idx + 1}</div>
+                </div>
+            `).join('')}
+            <div class="photo-add" onclick="openCamera('${sectionId}')">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                <span class="text-sm text-gray-500 mt-1">Ajouter</span>
+            </div>
+        </div>
+    `;
+}
+
+function viewPhoto(sectionId, idx) {
+    const photo = currentDraft.photos?.[sectionId]?.[idx];
+    if (photo) {
+        document.getElementById('modal-photo-img').src = photo.data;
+        document.getElementById('photo-modal').classList.add('show');
+    }
+}
+
+function closePhotoModal() {
+    document.getElementById('photo-modal').classList.remove('show');
+}
+
+function deletePhoto(sectionId, idx) {
+    if (!currentDraft.photos?.[sectionId]) return;
+    currentDraft.photos[sectionId].splice(idx, 1);
+    if (currentDraft.photos[sectionId].length === 0) delete currentDraft.photos[sectionId];
+    renderPhotoSection(sectionId);
+    showToast('🗑️ Photo supprimée');
+}
+
+function showDashboard() {
+    document.getElementById('dashboard-view').classList.remove('hidden');
+    document.getElementById('form-view').classList.add('hidden');
+    loadDraftsList();
+}
+
+function newDraft() {
+    currentDraft = { id: 'DRAFT_' + Date.now(), created: new Date().toISOString(), photos: {} };
+    selectedCaseType = '';
+    document.getElementById('form-title').textContent = 'Nouveau Dossier';
+    document.querySelectorAll('.case-type-btn').forEach(btn => btn.classList.remove('border-blue-500', 'bg-blue-50'));
+    renderSections();
+    document.getElementById('dashboard-view').classList.add('hidden');
+    document.getElementById('form-view').classList.remove('hidden');
+}
+
+function editDraftById(id) {
+    const draft = draftsCache[id];
+    if (draft) editDraft(draft);
+}
+
+function editDraft(draft) {
+    currentDraft = JSON.parse(JSON.stringify(draft));
+    selectedCaseType = draft.case_type || '';
+    document.getElementById('form-title').textContent = 'Édition Dossier';
+    renderSections();
+    populateForm();
+    document.querySelectorAll('.case-type-btn').forEach(btn => {
+        btn.classList.remove('border-blue-500', 'bg-blue-50');
+        if (btn.dataset.type === selectedCaseType) btn.classList.add('border-blue-500', 'bg-blue-50');
+    });
+    document.getElementById('dashboard-view').classList.add('hidden');
+    document.getElementById('form-view').classList.remove('hidden');
+}
+
+function selectCaseType(type) {
+    selectedCaseType = type;
+    currentDraft.case_type = type;
+    document.querySelectorAll('.case-type-btn').forEach(btn => {
+        btn.classList.remove('border-blue-500', 'bg-blue-50');
+        if (btn.dataset.type === type) btn.classList.add('border-blue-500', 'bg-blue-50');
+    });
+    renderSections();
+}
+
+function renderSections() {
+    const container = document.getElementById('sections-container');
+    container.innerHTML = '';
+
+    Object.values(sectionsConfig).forEach(section => {
+        let showSection = section.required;
+        if ((selectedCaseType === 'violent' || selectedCaseType === 'suspicious') && section.id === 'injuries') showSection = true;
+        if (selectedCaseType === 'pediatric') showSection = true;
+
+        const sectionDiv = document.createElement('div');
+        sectionDiv.className = `card form-section${showSection ? '' : ' hidden-section'}`;
+        sectionDiv.dataset.sectionId = section.id;
+
+        sectionDiv.innerHTML = `
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold flex items-center gap-2">
+                    <span>${section.icon}</span>
+                    ${escapeHtml(section.title)}
+                </h3>
+                ${!section.required ? `
+                    <label class="toggle-switch">
+                        <input type="checkbox" ${showSection ? 'checked' : ''} onchange="toggleSection('${section.id}', this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                ` : '<span class="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Requis</span>'}
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="fields-${section.id}">
+                ${section.fields.map(field => renderField(field)).join('')}
+            </div>
+        `;
+
+        container.appendChild(sectionDiv);
+        if (section.allowPhotos) renderPhotoSection(section.id);
+    });
+}
+
+function renderField(field) {
+    const value = currentDraft[field.id] != null ? currentDraft[field.id] : '';
+    const readonly = field.readonly ? 'readonly' : '';
+    const showMic = !field.readonly && (field.type === 'text' || field.type === 'textarea' || field.type === 'select');
+
+    let inputHtml = '';
+    if (field.type === 'textarea') {
+        inputHtml = `<textarea id="field-${field.id}" ${readonly} rows="3" placeholder="${escapeHtml(field.label)}">${escapeHtml(value)}</textarea>`;
+    } else if (field.type === 'select') {
+        const options = field.options.map(opt =>
+            `<option value="${escapeHtml(opt)}"${value === opt ? ' selected' : ''}>${escapeHtml(opt)}</option>`
+        ).join('');
+        inputHtml = `<select id="field-${field.id}"><option value="">-- Sélectionner --</option>${options}</select>`;
+    } else {
+        const dobAttr = field.id === 'dob' ? ' onchange="calculateAge(this.value)"' : '';
+        inputHtml = `<input type="${field.type}" id="field-${field.id}" value="${escapeHtml(value)}" ${readonly}${dobAttr}>`;
+    }
+
+    const micBtn = showMic ? `
+        <button type="button" class="mic-btn" data-field-id="field-${field.id}" onclick="startListening(this)" title="Saisie vocale">
+            ${micSvg()}
+        </button>
+    ` : '';
+
+    return `
+        <div class="field-group${field.type === 'textarea' ? ' md:col-span-2' : ''}">
+            <label>${escapeHtml(field.label)}</label>
+            <div class="relative">
+                ${inputHtml}
+                ${micBtn}
+            </div>
+        </div>
+    `;
+}
+
+function toggleSection(sectionId, show) {
+    const section = document.querySelector(`[data-section-id="${sectionId}"]`);
+    if (section) {
+        section.classList.toggle('hidden-section', !show);
+    }
+}
+
+function populateForm() {
+    Object.keys(currentDraft).forEach(key => {
+        if (key === 'photos') return;
+        const field = document.getElementById(`field-${key}`);
+        if (field) field.value = currentDraft[key];
+    });
+    if (currentDraft.dob) calculateAge(currentDraft.dob);
+}
+
+function collectFormData() {
+    const data = { ...currentDraft };
+    document.querySelectorAll('[id^="field-"]').forEach(field => {
+        data[field.id.replace('field-', '')] = field.value;
+    });
+    return data;
+}
+
+function saveDraft() {
+    const data = collectFormData();
+    data.lastModified = new Date().toISOString();
+    let drafts = JSON.parse(localStorage.getItem('autopsie_reck_drafts') || '[]');
+    const idx = drafts.findIndex(d => d.id === data.id);
+    if (idx >= 0) drafts[idx] = data;
+    else drafts.unshift(data);
+    try {
+        localStorage.setItem('autopsie_reck_drafts', JSON.stringify(drafts));
+        currentDraft = data;
+        showToast('💾 Brouillon sauvegardé');
+    } catch (e) {
+        showToast('⚠️ Stockage plein — réduisez le nombre de photos');
+    }
+}
+
+function saveAndClose() {
+    saveDraft();
+    showDashboard();
+}
+
+function loadDraftsList() {
+    const drafts = JSON.parse(localStorage.getItem('autopsie_reck_drafts') || '[]');
+    Object.keys(draftsCache).forEach(k => delete draftsCache[k]);
+    drafts.forEach(d => { draftsCache[d.id] = d; });
+
+    document.getElementById('stat-count').textContent = drafts.length;
+    document.getElementById('stat-drafts').textContent = drafts.length;
+
+    const list = document.getElementById('drafts-list');
+    list.innerHTML = '';
+
+    if (drafts.length === 0) {
+        list.innerHTML = `
+            <div class="text-center text-gray-400 py-12">
+                <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                <p>Aucun dossier pour le moment</p>
+                <button onclick="newDraft()" class="mt-4 text-blue-600 font-medium">Créer un nouveau dossier</button>
+            </div>
+        `;
+        return;
+    }
+
+    drafts.forEach(draft => {
+        const photoCount = draft.photos
+            ? Object.values(draft.photos).reduce((sum, arr) => sum + arr.length, 0)
+            : 0;
+
+        const card = document.createElement('div');
+        card.className = 'bg-white border rounded-lg p-4 hover:shadow-md transition-shadow';
+
+        const name = document.createElement('div');
+        name.className = 'font-bold text-gray-800';
+        name.textContent = (draft.last_name || 'Inconnu') + (draft.first_name ? ' ' + draft.first_name : '');
+
+        const ref = document.createElement('div');
+        ref.className = 'text-sm text-gray-600 mt-1';
+        ref.textContent = 'Réf: ' + (draft.req_number || 'N/A');
+
+        const meta = document.createElement('div');
+        meta.className = 'text-xs text-gray-500 mt-1 flex items-center gap-2';
+        meta.textContent = draft.case_type ? getTypeLabel(draft.case_type) : 'Non spécifié';
+
+        if (photoCount > 0) {
+            const badge = document.createElement('span');
+            badge.className = 'bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-xs';
+            badge.textContent = '📸 ' + photoCount + ' photos';
+            meta.appendChild(badge);
+        }
+        const dateBadge = document.createElement('span');
+        dateBadge.textContent = '• ' + new Date(draft.lastModified || draft.created).toLocaleDateString('fr-FR');
+        meta.appendChild(dateBadge);
+
+        const info = document.createElement('div');
+        info.className = 'flex-1';
+        info.append(name, ref, meta);
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'text-blue-600 hover:bg-blue-50 p-2 rounded';
+        editBtn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>';
+        editBtn.addEventListener('click', () => editDraftById(draft.id));
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'text-red-600 hover:bg-red-50 p-2 rounded';
+        delBtn.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>';
+        delBtn.addEventListener('click', () => deleteDraft(draft.id));
+
+        const actions = document.createElement('div');
+        actions.className = 'flex gap-2';
+        actions.append(editBtn, delBtn);
+
+        const row = document.createElement('div');
+        row.className = 'flex justify-between items-start';
+        row.append(info, actions);
+
+        card.appendChild(row);
+        list.appendChild(card);
+    });
+}
+
+function getTypeLabel(type) {
+    const labels = { violent: '🔪 Violent', natural: '🏥 Naturel', pediatric: '👶 Pédiatrique', suspicious: '❓ Suspect' };
+    return labels[type] || type;
+}
+
+function deleteDraft(id) {
+    if (!confirm('Supprimer ce dossier ?')) return;
+    let drafts = JSON.parse(localStorage.getItem('autopsie_reck_drafts') || '[]');
+    localStorage.setItem('autopsie_reck_drafts', JSON.stringify(drafts.filter(d => d.id !== id)));
+    delete draftsCache[id];
+    loadDraftsList();
+    showToast('🗑️ Dossier supprimé');
+}
+
+function exportToWord() {
+    const data = collectFormData();
+    function f(val) { return escapeHtml(val || ''); }
+    function formatDate(d) {
+        if (!d) return '';
+        const p = d.split('-');
+        return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : d;
+    }
+
+    let photosHtml = '';
+    if (data.photos) {
+        Object.entries(data.photos).forEach(([sectionId, photos]) => {
+            if (!photos.length) return;
+            const section = sectionsConfig[sectionId];
+            photosHtml += `<h2>Photos — ${f(section ? section.title : sectionId)}</h2><div style="display:flex;flex-wrap:wrap;gap:10px;">`;
+            photos.forEach((photo, idx) => {
+                photosHtml += `<div style="width:45%;margin-bottom:10px;"><img src="${photo.data}" style="width:100%;border:1px solid #ccc;"><p style="font-size:12px;color:#666;">Photo ${idx + 1}</p></div>`;
+            });
+            photosHtml += '</div>';
+        });
+    }
+
+    const content = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'>
+        <head><meta charset='utf-8'><title>Autopsie — ${f(data.last_name)}</title>
+        <style>body{font-family:Arial,sans-serif;line-height:1.6}h1{color:#1e40af;text-align:center}h2{color:#1e40af;border-bottom:2px solid #dbeafe;padding-bottom:.5rem;margin-top:1.5rem}.section{margin-bottom:2rem}.field{margin-bottom:.5rem}.label{font-weight:bold}img{max-width:100%}</style></head>
+        <body>
+        <h1>AUTOPSIE RECK</h1>
+        <h2>DOSSIER D'AUTOPSIE MÉDICO-LÉGALE</h2>
+        <div class="section"><h2>1. Administratif</h2>
+        <div class="field"><span class="label">N° Réquisition:</span> ${f(data.req_number)}</div>
+        <div class="field"><span class="label">Autorité:</span> ${f(data.authority)}</div>
+        <div class="field"><span class="label">Date/heure autopsie:</span> ${f(formatDate(data.autopsy_date))} ${f(data.autopsy_time)}</div>
+        <div class="field"><span class="label">Lieu:</span> ${f(data.autopsy_place)}</div>
+        <div class="field"><span class="label">Expert:</span> ${f(data.expert_name)}</div>
+        <div class="field"><span class="label">Technicien:</span> ${f(data.tech_name)}</div></div>
+        <div class="section"><h2>2. Identité</h2>
+        <div class="field"><span class="label">Nom:</span> ${f(data.last_name)} ${f(data.first_name)}</div>
+        <div class="field"><span class="label">Date naissance:</span> ${f(formatDate(data.dob))}</div>
+        <div class="field"><span class="label">Âge / Sexe:</span> ${f(data.age)} ans — ${f(data.sex)}</div>
+        <div class="field"><span class="label">Profession:</span> ${f(data.profession)}</div>
+        <div class="field"><span class="label">État civil:</span> ${f(data.civil_status)}</div>
+        <div class="field"><span class="label">Adresse:</span> ${f(data.address)}</div>
+        <div class="field"><span class="label">Père:</span> ${f(data.father_name)} | <span class="label">Mère:</span> ${f(data.mother_name)}</div>
+        <div class="field"><span class="label">Tél. famille:</span> ${f(data.family_phone)}</div></div>
+        <div class="section"><h2>3. Circonstances</h2>
+        <div class="field"><span class="label">Date/heure décès:</span> ${f(formatDate(data.death_date))} ${f(data.death_time)}</div>
+        <div class="field"><span class="label">Lieu:</span> ${f(data.death_place)}</div>
+        <div class="field"><span class="label">Hospitalisation:</span> ${f(data.hospitalized)}</div>
+        <div class="field"><span class="label">Antécédents médicaux:</span> ${f(data.medical_history)}</div>
+        <div class="field"><span class="label">Histoire sociale:</span> ${f(data.social_history)}</div>
+        <div class="field"><span class="label">Circonstances découverte:</span> ${f(data.discovery_circumstances)}</div></div>
+        <div class="section"><h2>4. Examen Externe</h2>
+        <div class="field"><span class="label">Poids / Taille:</span> ${f(data.body_weight)} kg / ${f(data.body_height)} cm</div>
+        <div class="field"><span class="label">État nutritionnel:</span> ${f(data.nutritional_status)}</div>
+        <div class="field"><span class="label">Vêtements:</span> ${f(data.clothing_desc)}</div>
+        <div class="field"><span class="label">Rigor / Livor:</span> ${f(data.rigor_mortis)} / ${f(data.livor_mortis)}</div>
+        <div class="field"><span class="label">Décomposition:</span> ${f(data.decomp_stage)}</div>
+        <div class="field"><span class="label">Cheveux:</span> ${f(data.hair_color)}</div>
+        <div class="field"><span class="label">Dentition:</span> ${f(data.dental_status)}</div>
+        <div class="field"><span class="label">Tatouages:</span> ${f(data.tattoos)}</div>
+        <div class="field"><span class="label">Cicatrices:</span> ${f(data.scars)}</div></div>
+        <div class="section"><h2>5. Lésions</h2>
+        <div class="field"><span class="label">Arme à feu:</span> ${f(data.firearm_injuries)}</div>
+        <div class="field"><span class="label">Arme blanche:</span> ${f(data.sharp_force_injuries)}</div>
+        <div class="field"><span class="label">Force contondante:</span> ${f(data.blunt_force_injuries)}</div>
+        <div class="field"><span class="label">Brûlures:</span> ${f(data.burns)}</div>
+        <div class="field"><span class="label">Strangulation:</span> ${f(data.strangulation)}</div>
+        <div class="field"><span class="label">Noyade:</span> ${f(data.drowning)}</div></div>
+        <div class="section"><h2>6. Examen Interne</h2>
+        <div class="field"><span class="label">Incision:</span> ${f(data.incision_type)} | Éviscération: ${f(data.evisceration_method)}</div>
+        <div class="field"><span class="label">Cerveau:</span> ${f(data.brain_weight)} g | Cœur: ${f(data.heart_weight)} g</div>
+        <div class="field"><span class="label">Poumons:</span> D: ${f(data.right_lung_weight)} g G: ${f(data.left_lung_weight)} g — ${f(data.lungs_findings)}</div>
+        <div class="field"><span class="label">Foie:</span> ${f(data.liver_weight)} g — ${f(data.liver_findings)}</div>
+        <div class="field"><span class="label">Rate:</span> ${f(data.spleen_weight)} g | Reins: D: ${f(data.right_kidney_weight)} g G: ${f(data.left_kidney_weight)} g</div>
+        <div class="field"><span class="label">Contenu gastrique:</span> ${f(data.stomach_content)}</div></div>
+        <div class="section"><h2>7. Procédures Ancillaires</h2>
+        <div class="field"><span class="label">Imagerie:</span> ${f(data.imaging)}</div>
+        <div class="field"><span class="label">Histologie:</span> ${f(data.histology)}</div>
+        <div class="field"><span class="label">Microbiologie:</span> ${f(data.microbiology)}</div>
+        <div class="field"><span class="label">Toxicologie:</span> ${f(data.toxicology)}</div></div>
+        ${photosHtml ? '<div class="section">' + photosHtml + '</div>' : ''}
+        <div class="section"><h2>8. Conclusions</h2>
+        <div class="field"><span class="label">Diagnostic 1:</span> ${f(data.diagnosis_1)}</div>
+        <div class="field"><span class="label">Diagnostic 2:</span> ${f(data.diagnosis_2)}</div>
+        <div class="field"><span class="label">Cause immédiate:</span> ${f(data.immediate_cause)}</div>
+        <div class="field"><span class="label">Cause du décès:</span> ${f(data.legal_cause)}</div>
+        <div class="field"><span class="label">Manière:</span> ${f(data.manner)}</div>
+        <div class="field"><span class="label">Commentaires:</span> ${f(data.comments)}</div></div>
+        <div class="section" style="margin-top:3rem">
+        <p>Fait à Dakar, le ${f(formatDate(data.signature_date))}</p><br><br>
+        <p>Le Médecin Expert,<br>${f(data.expert_signature || data.expert_name)}<br>${f(data.expert_title)}</p></div>
+        </body></html>`;
+
+    const blob = new Blob(['﻿', content], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Autopsie_${data.last_name || 'Dossier'}_${data.req_number || ''}.doc`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('✅ Document Word exporté avec photos');
+}
+
+function showToast(message) {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+</script>
+</body>
+</html>
