@@ -299,6 +299,7 @@ let voiceSessionId = 0;
 let currentPhotoSection = null;
 let cameraStream = null;
 const draftsCache = {};
+let initialFieldValue = '';
 
 function escapeHtml(str) {
     if (str == null) return '';
@@ -340,7 +341,7 @@ function initSpeechRecognition() {
                         .find(o => o.toLowerCase().includes(transcript.toLowerCase()));
                     if (match) field.value = match;
                 } else {
-                    field.value = transcript;
+                    field.value = initialFieldValue + transcript;
                     if (event.results[event.results.length - 1].isFinal) {
                         field.dispatchEvent(new Event('input'));
                     }
@@ -359,6 +360,12 @@ function initSpeechRecognition() {
 function startListening(btn) {
     if (!recognition) { showToast('❌ Reconnaissance vocale non supportée'); return; }
 
+    if (activeMicBtn === btn) {
+        stopListening();
+        try { recognition.abort(); } catch (e) {}
+        return;
+    }
+
     voiceSessionId++;
     const mySessionId = voiceSessionId;
 
@@ -371,6 +378,10 @@ function startListening(btn) {
     btn.classList.add('active');
     btn.innerHTML = micSvg();
     document.getElementById('voice-status').classList.add('show');
+
+    const field = document.getElementById(btn.dataset.fieldId);
+    initialFieldValue = field && field.tagName !== 'SELECT' ? field.value : '';
+    if (initialFieldValue && !initialFieldValue.endsWith(' ')) initialFieldValue += ' ';
 
     recognition.onend = () => {
         if (voiceSessionId === mySessionId) stopListening();
@@ -392,19 +403,26 @@ function stopListening() {
 }
 
 function calculateAge(dob) {
-    if (!dob) return;
+    const ageField = document.getElementById('field-age');
+    if (!ageField) return;
+    if (!dob) { ageField.value = ''; return; }
     const birth = new Date(dob);
+    if (isNaN(birth.getTime())) { ageField.value = ''; return; }
     const today = new Date();
     let age = today.getFullYear() - birth.getFullYear();
     const m = today.getMonth() - birth.getMonth();
     if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-    const ageField = document.getElementById('field-age');
-    if (ageField) ageField.value = age >= 0 ? age : 0;
+    ageField.value = age >= 0 ? age : 0;
 }
 
 function openCamera(sectionId) {
     currentPhotoSection = sectionId;
     document.getElementById('camera-modal').classList.add('show');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showToast('❌ Caméra non supportée ou protocole non sécurisé (HTTPS requis)');
+        closeCamera();
+        return;
+    }
     const video = document.getElementById('camera-video');
     navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
@@ -428,10 +446,17 @@ function closeCamera() {
 function capturePhoto() {
     const video = document.getElementById('camera-video');
     const canvas = document.getElementById('camera-canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    const imageData = canvas.toDataURL('image/jpeg', 0.8);
+    const maxDim = 1024;
+    let w = video.videoWidth || 1280;
+    let h = video.videoHeight || 720;
+    if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else { w = Math.round(w * maxDim / h); h = maxDim; }
+    }
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+    const imageData = canvas.toDataURL('image/jpeg', 0.7);
     if (!currentDraft.photos) currentDraft.photos = {};
     if (!currentDraft.photos[currentPhotoSection]) currentDraft.photos[currentPhotoSection] = [];
     currentDraft.photos[currentPhotoSection].push({ data: imageData, timestamp: new Date().toISOString(), caption: '' });
@@ -664,6 +689,7 @@ function saveAndClose() {
 
 function loadDraftsList() {
     const drafts = JSON.parse(localStorage.getItem('autopsie_reck_drafts') || '[]');
+    Object.keys(draftsCache).forEach(k => delete draftsCache[k]);
     drafts.forEach(d => { draftsCache[d.id] = d; });
 
     document.getElementById('stat-count').textContent = drafts.length;
@@ -757,6 +783,11 @@ function deleteDraft(id) {
 function exportToWord() {
     const data = collectFormData();
     function f(val) { return escapeHtml(val || ''); }
+    function formatDate(d) {
+        if (!d) return '';
+        const p = d.split('-');
+        return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : d;
+    }
 
     let photosHtml = '';
     if (data.photos) {
@@ -781,13 +812,13 @@ function exportToWord() {
         <div class="section"><h2>1. Administratif</h2>
         <div class="field"><span class="label">N° Réquisition:</span> ${f(data.req_number)}</div>
         <div class="field"><span class="label">Autorité:</span> ${f(data.authority)}</div>
-        <div class="field"><span class="label">Date/heure autopsie:</span> ${f(data.autopsy_date)} ${f(data.autopsy_time)}</div>
+        <div class="field"><span class="label">Date/heure autopsie:</span> ${f(formatDate(data.autopsy_date))} ${f(data.autopsy_time)}</div>
         <div class="field"><span class="label">Lieu:</span> ${f(data.autopsy_place)}</div>
         <div class="field"><span class="label">Expert:</span> ${f(data.expert_name)}</div>
         <div class="field"><span class="label">Technicien:</span> ${f(data.tech_name)}</div></div>
         <div class="section"><h2>2. Identité</h2>
         <div class="field"><span class="label">Nom:</span> ${f(data.last_name)} ${f(data.first_name)}</div>
-        <div class="field"><span class="label">Date naissance:</span> ${f(data.dob)}</div>
+        <div class="field"><span class="label">Date naissance:</span> ${f(formatDate(data.dob))}</div>
         <div class="field"><span class="label">Âge / Sexe:</span> ${f(data.age)} ans — ${f(data.sex)}</div>
         <div class="field"><span class="label">Profession:</span> ${f(data.profession)}</div>
         <div class="field"><span class="label">État civil:</span> ${f(data.civil_status)}</div>
@@ -795,7 +826,7 @@ function exportToWord() {
         <div class="field"><span class="label">Père:</span> ${f(data.father_name)} | <span class="label">Mère:</span> ${f(data.mother_name)}</div>
         <div class="field"><span class="label">Tél. famille:</span> ${f(data.family_phone)}</div></div>
         <div class="section"><h2>3. Circonstances</h2>
-        <div class="field"><span class="label">Date/heure décès:</span> ${f(data.death_date)} ${f(data.death_time)}</div>
+        <div class="field"><span class="label">Date/heure décès:</span> ${f(formatDate(data.death_date))} ${f(data.death_time)}</div>
         <div class="field"><span class="label">Lieu:</span> ${f(data.death_place)}</div>
         <div class="field"><span class="label">Hospitalisation:</span> ${f(data.hospitalized)}</div>
         <div class="field"><span class="label">Antécédents médicaux:</span> ${f(data.medical_history)}</div>
@@ -839,7 +870,7 @@ function exportToWord() {
         <div class="field"><span class="label">Manière:</span> ${f(data.manner)}</div>
         <div class="field"><span class="label">Commentaires:</span> ${f(data.comments)}</div></div>
         <div class="section" style="margin-top:3rem">
-        <p>Fait à Dakar, le ${f(data.signature_date)}</p><br><br>
+        <p>Fait à Dakar, le ${f(formatDate(data.signature_date))}</p><br><br>
         <p>Le Médecin Expert,<br>${f(data.expert_signature || data.expert_name)}<br>${f(data.expert_title)}</p></div>
         </body></html>`;
 
