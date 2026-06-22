@@ -55,7 +55,16 @@ KHALABA is a digital maternal-infant health platform targeting Sub-Saharan Afric
 - ✅ `GET /api/audit-logs` — every DHIS2 export is audit-logged (user, period, zone, values summary)
 - ✅ MPDSR form extended with `audit_status` (Non audité / En attente / Audité en comité) + `audit_date`, used for DE_MPDSR_AUDITED (<30 days from death)
 - ✅ Admin "Indicateurs MSP" page (`/app/admin/indicators`): filter (period + zone), table 10 indicators, bar chart, JSON preview + copy/download buttons
-- ✅ 46/46 backend tests passing
+
+## Implemented (Iteration 4 — Feb 28, 2026) — Suivi obstétrical OMS
+- ✅ Module `lib/pregnancyCalc.js` : Naegele (LMP→EDD), âge gestationnel (SA+j), calendrier OMS 8 contacts (CPN1=0w, CPN2=20w, CPN3=26w, CPN4=30w, CPN5=34w, CPN6=36w, CPN7=38w, CPN8=40w)
+- ✅ CPN form enrichi : bloc "Calculs OMS" automatique (GA + DPA + prochaine CPN), alerte "CPN1 tardive" si GA>12 SA, hint anémie en ligne (Hb<11), case "auto-schedule next appointment" qui crée le RDV à la date OMS
+- ✅ Nouvelle page "Grossesses actives" (`/app/soignant/grossesses`) avec `PregnancyCard` (statut/GA/DPA/dernière CPN/prochaine CPN/anémie), bannière CPN en retard >7j (jaune) / >14j (rouge urgente), action "Marquer LTFU"
+- ✅ Endpoints backend : `GET /api/pregnancies` (zone-filtré pour soignant, avec patient + last_cpn nested), `PATCH /api/pregnancies/{id}` (statut), `POST /api/pregnancies/{id}/found` (marque retrouvée)
+- ✅ Statuts grossesse : `en_cours`, `perdue_vue`, `accouchee`, `fausse_couche`, `ivg`, `transferee` + legacy `active`
+- ✅ Normalisation HIV/Syphilis aux valeurs canoniques MSP : NEG / POS / INCONNU (rétrocompatible avec données legacy negatif/positif)
+- ✅ Filtre "Perdues de vue" + KPI strip + actions rapides (Appeler tel: / Marquer retrouvée / Nouvelle CPN / Ouvrir dossier)
+- ✅ **55/55 tests pytest passent**
 
 ## Backlog (P0 → P2)
 - P1: Appointments scheduler with calendar UI (model exists, UI is a list)

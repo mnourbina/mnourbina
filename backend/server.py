@@ -270,13 +270,74 @@ async def create_pregnancy(payload: PregnancyIn, user=Depends(require_role("soig
     doc = {
         "id": new_id(),
         **payload.model_dump(),
-        "status": "active",
+        "status": "en_cours",
         "created_at": now_iso(),
         "created_by": user["id"],
     }
     await db.pregnancies.insert_one(doc)
     doc.pop('_id', None)
     return doc
+
+
+@api.get("/pregnancies")
+async def list_pregnancies(
+    status: Optional[str] = None,
+    user=Depends(current_user),
+):
+    """List pregnancies (with nested patient + last CPN). Soignant: zone-filtered."""
+    if user["role"] == "patient":
+        raise HTTPException(403, "Réservé aux soignants")
+    if user["role"] == "soignant" and user.get("zone_id"):
+        patient_ids = [p["id"] async for p in db.patients.find({"zone_id": user["zone_id"]}, {"id": 1})]
+        q = {"patient_id": {"$in": patient_ids}}
+    else:
+        q = {}
+    if status:
+        q["status"] = status
+    pregnancies = await db.pregnancies.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
+    results = []
+    for preg in pregnancies:
+        patient = await db.patients.find_one({"id": preg["patient_id"]}, {"_id": 0})
+        last_cpn = await db.cpn_visits.find_one(
+            {"pregnancy_id": preg["id"]},
+            {"_id": 0},
+            sort=[("visit_number", -1)],
+        )
+        preg["patient"] = patient
+        preg["last_cpn"] = last_cpn
+        results.append(preg)
+    return results
+
+
+@api.patch("/pregnancies/{pregnancy_id}")
+async def update_pregnancy(pregnancy_id: str, payload: dict, user=Depends(require_role("soignant", "admin"))):
+    allowed_status = {"en_cours", "perdue_vue", "accouchee", "fausse_couche", "ivg", "transferee", "active"}
+    update = {}
+    if "status" in payload:
+        if payload["status"] not in allowed_status:
+            raise HTTPException(400, "Statut invalide")
+        update["status"] = payload["status"]
+    for k in ("notes", "delivery_date", "found_at"):
+        if k in payload:
+            update[k] = payload[k]
+    if not update:
+        raise HTTPException(400, "Aucun champ valide à modifier")
+    update["updated_at"] = now_iso()
+    res = await db.pregnancies.update_one({"id": pregnancy_id}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Grossesse introuvable")
+    return await db.pregnancies.find_one({"id": pregnancy_id}, {"_id": 0})
+
+
+@api.post("/pregnancies/{pregnancy_id}/found")
+async def mark_pregnancy_found(pregnancy_id: str, user=Depends(require_role("soignant", "admin"))):
+    res = await db.pregnancies.update_one(
+        {"id": pregnancy_id},
+        {"$set": {"status": "en_cours", "found_at": now_iso(), "updated_at": now_iso()}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(404, "Grossesse introuvable")
+    return await db.pregnancies.find_one({"id": pregnancy_id}, {"_id": 0})
 
 
 @api.get("/pregnancies/{pregnancy_id}")
