@@ -1,0 +1,159 @@
+{
+  "project_context": {
+    "name": "KHALABA",
+    "domain": "Maternal & Infant Health Web Application (Sub-Saharan Africa)",
+    "theme": "LIGHT",
+    "archetype": "1 (Organic & Earthy)"
+  },
+  "design_philosophy": {
+    "core_principles": [
+      "Warm & Empathetic: Avoid sterile clinical blue/white themes. Healthcare must feel approachable, human, and rooted in the community.",
+      "Field-Ready Legibility: UI must be extremely clear on mobile devices in variable lighting. High contrast for text, generous touch targets.",
+      "Cultural Resonance: Subtle nods to African earth tones and textures without falling into caricature.",
+      "Information Hierarchy: Complex medical data (CPN forms, postnatal tracking) must be chunked into manageable, clearly separated cards."
+    ]
+  },
+  "color_system": {
+    "palette": {
+      "primary": {
+        "DEFAULT": "#C85A48",
+        "foreground": "#FFFFFF",
+        "description": "Terracotta - Represents the earth, warmth, and life. Used for primary CTAs and active states."
+      },
+      "secondary": {
+        "DEFAULT": "#D99A5A",
+        "foreground": "#3E2723",
+        "description": "Soft Ochre - Used for secondary actions, subtle highlights, and supportive UI elements."
+      },
+      "accent": {
+        "DEFAULT": "#F2C94C",
+        "foreground": "#3E2723",
+        "description": "Luminous Gold - Used sparingly for key alerts, important notifications, or to draw attention to critical metrics."
+      },
+      "background": {
+        "DEFAULT": "#F7F3EB",
+        "description": "Sand Beige - The main app background. Provides a warm, calming base instead of stark white."
+      },
+      "surface": {
+        "DEFAULT": "#FFFFFF",
+        "description": "Pure white for cards and form containers to ensure maximum contrast and readability against the Sand Beige background."
+      },
+      "text": {
+        "main": "#3E2723",
+        "muted": "#795C55",
+        "description": "Deep Chocolate for primary text (avoids the harshness of pure black). Lighter brown for muted/secondary text."
+      },
+      "status": {
+        "success": "#4A7C59",
+        "warning": "#E89F4C",
+        "error": "#B83A2E"
+      }
+    }
+  },
+  "typography": {
+    "fonts": {
+      "heading": "Outfit, sans-serif",
+      "body": "Work Sans, sans-serif"
+    },
+    "hierarchy": {
+      "h1": "font-heading text-4xl sm:text-5xl font-semibold tracking-tight text-[#3E2723]",
+      "h2": "font-heading text-2xl sm:text-3xl font-medium tracking-tight text-[#3E2723]",
+      "h3": "font-heading text-xl sm:text-2xl font-medium text-[#3E2723]",
+      "h4": "font-heading text-lg font-medium text-[#3E2723]",
+      "body": "font-body text-base leading-relaxed text-[#3E2723]",
+      "small": "font-body text-sm font-medium text-[#795C55] uppercase tracking-[0.05em]"
+    },
+    "rules": [
+      "Do NOT use Inter or standard system fonts for headings.",
+      "Ensure all text has a minimum contrast ratio of 4.5:1 against its background."
+    ]
+  },
+  "layout_and_spacing": {
+    "strategy": "Mobile-first, generous spacing for readability in the field.",
+    "scale": {
+      "section_padding": "py-12 md:py-20",
+      "container_padding": "px-4 md:px-8",
+      "card_padding": "p-6 md:p-8",
+      "gap_standard": "gap-6",
+      "gap_large": "gap-12"
+    },
+    "grid_modes": {
+      "dashboard": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
+      "forms": "grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8"
+    },
+    "corners": {
+      "cards": "rounded-2xl",
+      "buttons": "rounded-xl",
+      "inputs": "rounded-xl"
+    },
+    "shadows": {
+      "soft": "shadow-[0_4px_20px_rgba(62,39,35,0.05)]",
+      "floating": "shadow-[0_8px_30px_rgba(62,39,35,0.08)]"
+    }
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#C85A48] hover:bg-[#B34D3D] text-white rounded-xl px-6 py-3 font-medium transition-colors shadow-sm",
+      "secondary": "bg-[#D99A5A]/20 hover:bg-[#D99A5A]/30 text-[#3E2723] rounded-xl px-6 py-3 font-medium transition-colors",
+      "outline": "border-2 border-[#C85A48] text-[#C85A48] hover:bg-[#C85A48]/5 rounded-xl px-6 py-3 font-medium transition-colors",
+      "touch_target": "MUST be at least 48px height on mobile for field workers."
+    },
+    "cards": {
+      "style": "bg-white rounded-2xl shadow-[0_4px_20px_rgba(62,39,35,0.05)] border border-[#3E2723]/5 p-6",
+      "usage": "Use for dashboard widgets, patient summary blocks, and wrapping form sections."
+    },
+    "forms": {
+      "inputs": "bg-[#F7F3EB]/50 border border-[#3E2723]/10 text-[#3E2723] rounded-xl px-4 py-3 focus:ring-2 focus:ring-[#C85A48]/50 focus:border-[#C85A48] transition-all",
+      "labels": "text-sm font-medium text-[#795C55] mb-2 block",
+      "structure": "Group related fields (e.g., Constantes Cliniques, Bilans Biologiques) into distinct card-like sections to reduce cognitive load for health workers."
+    },
+    "navigation": {
+      "style": "bg-white/90 backdrop-blur-xl border-b border-[#3E2723]/10 sticky top-0 z-50",
+      "links": "text-[#795C55] hover:text-[#C85A48] font-medium transition-colors"
+    },
+    "charts": {
+      "library": "Recharts",
+      "colors": ["#C85A48", "#D99A5A", "#F2C94C", "#4A7C59", "#795C55"],
+      "style": "Remove default Recharts grid lines or make them extremely faint. Use rounded corners on bar charts."
+    }
+  },
+  "icons": {
+    "library": "lucide-react",
+    "style": "Use strokeWidth={2}. For a warmer feel, use icons that represent human connection rather than generic tech where possible."
+  },
+  "media": {
+    "images": {
+      "hero_mother_baby": {
+        "url": "https://images.unsplash.com/photo-1780329936573-546f6350bf0c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA3MDR8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwbW90aGVyJTIwYmFieSUyMGhhcHB5JTIwaGVhbHRofGVufDB8fHx8MTc4MjA4NzE2NHww&ixlib=rb-4.1.0&q=85",
+        "description": "Smiling baby being bathed, conveying health, warmth, and care. Use in the landing page hero section.",
+        "overlay": "bg-gradient-to-r from-[#F7F3EB]/90 to-[#F7F3EB]/40 for text contrast."
+      },
+      "midwife_doctor_1": {
+        "url": "https://images.unsplash.com/photo-1643297654416-05795d62e39c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjV8MHwxfHNlYXJjaHwyfHxhZnJpY2FuJTIwbWlkd2lmZSUyMGRvY3RvciUyMHNtaWxpbmd8ZW58MHx8fHwxNzgyMDg3MTY0fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Smiling African female doctor/midwife holding stethoscope. Use for the 'Healthcare Professional' portal login or features section."
+      },
+      "midwife_doctor_2": {
+        "url": "https://images.unsplash.com/photo-1536064479547-7ee40b74b807?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjV8MHwxfHNlYXJjaHwxfHxhZnJpY2FuJTIwbWlkd2lmZSUyMGRvY3RvciUyMHNtaWxpbmd8ZW58MHx8fHwxNzgyMDg3MTY0fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Doctor consulting with a patient. Use in about us or value proposition section."
+      },
+      "abstract_texture": {
+        "url": "https://images.pexels.com/photos/11025124/pexels-photo-11025124.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Rusty terracotta texture. Can be used as a very subtle, low-opacity (opacity-5) background pattern for specific highlight sections or login screens."
+      }
+    }
+  },
+  "testing": {
+    "attributes": "ALL interactive elements (buttons, links, form inputs, tabs) MUST include a 'data-testid' attribute (e.g., data-testid='login-submit-btn')."
+  },
+  "instructions_to_main_agent": [
+    "Use Tailwind CSS for all styling. Rely on the custom colors defined in this JSON.",
+    "Implement the Layout and Spacing strictly. Do not use raw HTML forms without styling; wrap them in Shadcn components customized with the 'forms' and 'inputs' classes above.",
+    "Implement mobile-first responsive design as health workers will use this on mobile devices.",
+    "Do NOT use placeholder images. Use the Unsplash/Pexels URLs provided in the media section.",
+    "For the dashboards, use Recharts and apply the custom color palette provided.",
+    "The logo concept: Create a custom SVG logo using the letter 'K' creatively structured like a mother cradling a child, featuring a Luminous Gold (#F2C94C) radiating heart at the center, as specified in the investment dossier.",
+    "Ensure French language is used for all UI text (e.g., 'Connexion', 'Tableau de bord', 'Dossier Patient', 'Constantes Cliniques').",
+    "Provide clear feedback (toasts/alerts) on form submission for the CPN and MPDSR forms.",
+    "Since the codebase uses .js files, ensure all React components and configurations are written in JavaScript (ES6+), not TypeScript."
+  ]
+}
