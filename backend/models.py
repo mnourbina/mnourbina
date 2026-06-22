@@ -78,6 +78,8 @@ class PatientIn(BaseModel):
     dob: str  # ISO date
     phone: Optional[str] = None
     address: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     zone_id: str
     structure_id: Optional[str] = None
     blood_group: Optional[str] = None

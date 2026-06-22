@@ -1468,6 +1468,47 @@ async def audit_logs_summary(user=Depends(require_role("admin"))):
     return {"total": total, "by_action": by_action, "by_entity": by_entity}
 
 
+@api.get("/audit-logs/export.csv")
+async def export_audit_logs_csv(
+    action: Optional[str] = None,
+    entity: Optional[str] = None,
+    user_id: Optional[str] = None,
+    limit: int = 5000,
+    user=Depends(require_role("admin")),
+):
+    """Brique 13 — CSV export of audit logs for MSP inspections."""
+    q: dict = {}
+    if action:
+        q["action"] = action
+    if entity:
+        q["entity"] = entity
+    if user_id:
+        q["user_id"] = user_id
+    rows = await db.audit_logs.find(q, {"_id": 0}).sort("created_at", -1).to_list(limit)
+
+    buf = io.StringIO()
+    w = csv.writer(buf, lineterminator="\n")
+    w.writerow(["created_at", "user_email", "user_role", "action", "entity", "entity_id"])
+    for r in rows:
+        w.writerow([
+            r.get("created_at", ""),
+            r.get("user_email", ""),
+            r.get("user_role", ""),
+            r.get("action", ""),
+            r.get("entity", ""),
+            r.get("entity_id", ""),
+        ])
+    # Audit the export itself (meta)
+    await audit(user, "EXPORT_AUDIT_LOGS", "AuditLog",
+                extra={"rows": len(rows), "filters": {k: v for k, v in q.items()}})
+    today = datetime.now(timezone.utc).date().isoformat()
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="audit_logs_{today}.csv"'},
+    )
+
+
 @api.get("/reports/district")
 async def district_monthly_report(
     month: int,

@@ -145,6 +145,18 @@ KHALABA is a digital maternal-infant health platform targeting Sub-Saharan Afric
 - ✅ **Twilio WhatsApp** : skip (option c). Doc complète `/app/backend/TWILIO_INTEGRATION.md` avec étapes credentials + code Python prêt à coller (env vars, sandbox, audit hook)
 - ✅ **97/97 tests pytest passent** (92 anciens + 5 nouveaux test_iteration12_structure_hierarchy.py)
 
+## Implemented (Iteration 12 — Feb 28, 2026) — Brique 13 : Audit CSV export + ASC mobile-first LTFU
+- ✅ **`GET /api/audit-logs/export.csv`** (admin only) — filtres `action`/`entity`/`user_id`, limit 5000, audit meta `EXPORT_AUDIT_LOGS` automatique
+- ✅ **Boutons "Export CSV" + "Imprimer/PDF"** ajoutés sur la page Journal d'audit (`AdminAuditLogsPage`). `window.print()` utilisé pour le PDF (rendu navigateur, classe `print:hidden` sur les filtres/header)
+- ✅ **`PatientIn` enrichi** : champs optionnels `latitude` + `longitude` (degrés décimaux)
+- ✅ **Nouvelle page `/app/soignant/ltfu`** (`AscLTFUPage.jsx`) — mobile-first dédiée aux ASC :
+  - Header sticky, gros boutons tap-friendly, refresh rond
+  - Cartes verticales avec bordure rouge urgence, badge "X sem" en haut à droite
+  - **Geolocation** : bouton "Itinéraire" qui ouvre Google Maps `dir/?api=1&destination=lat,lng&travelmode=walking` quand coords disponibles, sinon `search/?query=ADDRESS` en fallback. "Adresse manquante" si rien
+  - Bouton `tel:` direct, "Marquer retrouvée" full-width vert
+- ✅ Nav soignant enrichi : "Recherche LTFU"
+- ✅ **102/102 tests pytest passent** (97 anciens + 5 nouveaux test_iteration13_audit_export.py — CSV shape, filtres, RBAC, meta-audit, géoloc patient)
+
 
 
 ## Backlog (P0 → P2)

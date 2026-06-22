@@ -33,6 +33,7 @@ import AdminIndicators from "@/pages/admin/AdminIndicators";
 import AdminMonthlyReport from "@/pages/admin/AdminMonthlyReport";
 import AdminLTFUPage from "@/pages/admin/AdminLTFUPage";
 import AdminAuditLogsPage from "@/pages/admin/AdminAuditLogsPage";
+import AscLTFUPage from "@/pages/soignant/AscLTFUPage";
 
 import "@/App.css";
 
@@ -101,6 +102,7 @@ function App() {
           <Route path="/app/soignant/mpdsr" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><MPDSRPage /></AppLayout></ProtectedRoute>} />
           <Route path="/app/soignant/audit/:id" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><MPDSRAuditPage /></AppLayout></ProtectedRoute>} />
           <Route path="/app/soignant/alerts" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><AlertsPage /></AppLayout></ProtectedRoute>} />
+          <Route path="/app/soignant/ltfu" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><AscLTFUPage /></AppLayout></ProtectedRoute>} />
           <Route path="/app/soignant/agenda" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><SoignantAgenda /></AppLayout></ProtectedRoute>} />
 
           {/* Admin */}

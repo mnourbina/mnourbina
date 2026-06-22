@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { History, User2, ListChecks, Filter } from "lucide-react";
+import { History, User2, ListChecks, Filter, Download, Printer } from "lucide-react";
 
 export default function AdminAuditLogsPage() {
   const [logs, setLogs] = useState([]);
@@ -29,13 +29,39 @@ export default function AdminAuditLogsPage() {
   const entities = useMemo(() => (summary?.by_entity || []).map(x => x.entity), [summary]);
 
   return (
-    <div className="space-y-6" data-testid="admin-audit-logs">
-      <header>
-        <span className="text-xs font-medium uppercase tracking-[0.2em] text-[#C85A48]">Traçabilité</span>
-        <h1 className="font-heading text-3xl sm:text-4xl font-semibold text-[#3E2723] mt-2 flex items-center gap-3">
-          <History size={28} /> Journal d'audit
-        </h1>
-        <p className="mt-2 text-[#795C55]">Toutes les actions sensibles (CREATE / UPDATE / EXPORT / ASSIGNED_LTFU / MARKED_FOUND…).</p>
+    <div className="space-y-6 print:p-0" data-testid="admin-audit-logs">
+      <header className="flex flex-wrap items-start justify-between gap-4 print:hidden">
+        <div>
+          <span className="text-xs font-medium uppercase tracking-[0.2em] text-[#C85A48]">Traçabilité</span>
+          <h1 className="font-heading text-3xl sm:text-4xl font-semibold text-[#3E2723] mt-2 flex items-center gap-3">
+            <History size={28} /> Journal d&apos;audit
+          </h1>
+          <p className="mt-2 text-[#795C55]">Toutes les actions sensibles (CREATE / UPDATE / EXPORT / ASSIGNED_LTFU / MARKED_FOUND…).</p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={async () => {
+              const params = new URLSearchParams();
+              Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v); });
+              params.set("limit", "5000");
+              const res = await api.get(`/audit-logs/export.csv?${params.toString()}`, { responseType: "blob" });
+              const url = URL.createObjectURL(res.data);
+              const a = document.createElement("a");
+              a.href = url; a.download = `audit_logs_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+            }}
+            className="inline-flex items-center gap-2 bg-[#3E2723] hover:bg-[#2a1c1a] text-white px-4 h-11 rounded-xl font-medium"
+            data-testid="audit-export-csv"
+          >
+            <Download size={16}/> Export CSV
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-2 bg-[#C85A48] hover:bg-[#B34D3D] text-white px-4 h-11 rounded-xl font-medium"
+            data-testid="audit-print"
+          >
+            <Printer size={16}/> Imprimer / PDF
+          </button>
+        </div>
       </header>
 
       {summary && (
