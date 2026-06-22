@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="7" skipped="0" tests="9" time="2.161" timestamp="2026-06-22T01:41:22.816806+00:00" hostname="agent-env-fd3dac78-1a06-42c2-94b1-09717d551e25"><testcase classname="backend.tests.test_iteration4_pregnancies.TestPregnanciesList" name="test_soignant_list_pregnancies" time="0.472"><failure message="AssertionError: Expected 200, got 405: {&quot;detail&quot;:&quot;Method Not Allowed&quot;}&#10;assert 405 == 200&#10; +  where 405 = &lt;Response [405]&gt;.status_code">backend/tests/test_iteration4_pregnancies.py:44: in test_soignant_list_pregnancies
+    assert r.status_code == 200, f"Expected 200, got {r.status_code}: {r.text[:300]}"
+E   AssertionError: Expected 200, got 405: {"detail":"Method Not Allowed"}
+E   assert 405 == 200
+E    +  where 405 = &lt;Response [405]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_iteration4_pregnancies.TestPregnanciesList" name="test_admin_list_all_pregnancies" time="0.481"><failure message="AssertionError: {&quot;detail&quot;:&quot;Method Not Allowed&quot;}&#10;assert 405 == 200&#10; +  where 405 = &lt;Response [405]&gt;.status_code">backend/tests/test_iteration4_pregnancies.py:58: in test_admin_list_all_pregnancies
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Method Not Allowed"}
+E   assert 405 == 200
+E    +  where 405 = &lt;Response [405]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_iteration4_pregnancies.TestPregnanciesList" name="test_patient_forbidden" time="0.401"><failure message="assert 405 == 403&#10; +  where 405 = &lt;Response [405]&gt;.status_code">backend/tests/test_iteration4_pregnancies.py:63: in test_patient_forbidden
+    assert r.status_code == 403
+E   assert 405 == 403
+E    +  where 405 = &lt;Response [405]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_iteration4_pregnancies.TestPregnancyPatch" name="test_patch_status_perdue_vue" time="0.169"><failure message="AssertionError: {&quot;detail&quot;:&quot;Method Not Allowed&quot;}&#10;assert 405 == 200&#10; +  where 405 = &lt;Response [405]&gt;.status_code">backend/tests/test_iteration4_pregnancies.py:79: in test_patch_status_perdue_vue
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Method Not Allowed"}
+E   assert 405 == 200
+E    +  where 405 = &lt;Response [405]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_iteration4_pregnancies.TestPregnancyPatch" name="test_patch_404" time="0.044"><failure message="assert 405 == 404&#10; +  where 405 = &lt;Response [405]&gt;.status_code">backend/tests/test_iteration4_pregnancies.py:85: in test_patch_404
+    assert r.status_code == 404
+E   assert 405 == 404
+E    +  where 405 = &lt;Response [405]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_iteration4_pregnancies.TestPregnancyPatch" name="test_patch_forbidden_patient" time="0.042"><failure message="assert 405 == 403&#10; +  where 405 = &lt;Response [405]&gt;.status_code">backend/tests/test_iteration4_pregnancies.py:90: in test_patch_forbidden_patient
+    assert r.status_code == 403
+E   assert 405 == 403
+E    +  where 405 = &lt;Response [405]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_iteration4_pregnancies.TestPregnancyFound" name="test_found_resets_status" time="0.176"><failure message="AssertionError: {&quot;detail&quot;:&quot;Not Found&quot;}&#10;assert 404 == 200&#10; +  where 404 = &lt;Response [404]&gt;.status_code">backend/tests/test_iteration4_pregnancies.py:103: in test_found_resets_status
+    assert r.status_code == 200, r.text
+E   AssertionError: {"detail":"Not Found"}
+E   assert 404 == 200
+E    +  where 404 = &lt;Response [404]&gt;.status_code</failure></testcase><testcase classname="backend.tests.test_iteration4_pregnancies.TestPregnancyFound" name="test_found_404" time="0.041" /><testcase classname="backend.tests.test_iteration4_pregnancies.TestDhis2NegPosNormalisation" name="test_neg_pos_counted" time="0.224" /></testsuite></testsuites>

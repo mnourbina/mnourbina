@@ -478,7 +478,8 @@ async def patient_timeline(user=Depends(current_user)):
 async def analytics_overview(user=Depends(require_role("admin"))):
     total_patients = await db.patients.count_documents({})
     total_pregnancies = await db.pregnancies.count_documents({})
-    active_pregnancies = await db.pregnancies.count_documents({"status": "active"})
+    # Also count in analytics endpoint
+    active_pregnancies = await db.pregnancies.count_documents({"status": {"$in": ["active", "en_cours"]}})
     total_cpn = await db.cpn_visits.count_documents({})
     total_postnatal = await db.postnatal_visits.count_documents({})
     total_vaccinations = await db.vaccinations.count_documents({})
@@ -584,10 +585,10 @@ async def _compute_dhis2_indicators(zone_id: Optional[str], date_from: Optional[
     cpn4 = cpn4_doc[0]["n"] if cpn4_doc else 0
 
     anemia = await db.cpn_visits.count_documents({**cpn_q, "hemoglobin": {"$lt": 11, "$gt": 0}})
-    vih_tested = await db.cpn_visits.count_documents({**cpn_q, "hiv_status": {"$in": ["negatif", "positif"]}})
-    vih_pos = await db.cpn_visits.count_documents({**cpn_q, "hiv_status": "positif"})
-    syph_tested = await db.cpn_visits.count_documents({**cpn_q, "syphilis_status": {"$in": ["negatif", "positif"]}})
-    syph_pos = await db.cpn_visits.count_documents({**cpn_q, "syphilis_status": "positif"})
+    vih_tested = await db.cpn_visits.count_documents({**cpn_q, "hiv_status": {"$in": ["negatif", "positif", "NEG", "POS"]}})
+    vih_pos = await db.cpn_visits.count_documents({**cpn_q, "hiv_status": {"$in": ["positif", "POS"]}})
+    syph_tested = await db.cpn_visits.count_documents({**cpn_q, "syphilis_status": {"$in": ["negatif", "positif", "NEG", "POS"]}})
+    syph_pos = await db.cpn_visits.count_documents({**cpn_q, "syphilis_status": {"$in": ["positif", "POS"]}})
 
     mpdsr_q: dict = {}
     if patient_ids is not None:

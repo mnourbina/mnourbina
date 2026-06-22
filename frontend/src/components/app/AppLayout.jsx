@@ -28,6 +28,7 @@ const navByRole = (t) => ({
   ],
   soignant: [
     { to: "/app/soignant", icon: LayoutDashboard, label: t("nav.dashboard"), testid: "nav-soignant-dash" },
+    { to: "/app/soignant/grossesses", icon: Heart, label: t("nav.pregnancies"), testid: "nav-soignant-pregnancies" },
     { to: "/app/soignant/patients", icon: Users, label: t("nav.patients"), testid: "nav-soignant-patients" },
     { to: "/app/soignant/agenda", icon: Calendar, label: t("nav.agenda"), testid: "nav-soignant-agenda" },
     { to: "/app/soignant/mpdsr", icon: AlertTriangle, label: t("nav.mpdsr"), testid: "nav-soignant-mpdsr" },

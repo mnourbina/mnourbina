@@ -1,0 +1,56 @@
+{
+  "summary": "Iteration 4 — Pregnancies follow-up MSP pattern. Backend endpoints required by the spec (GET /api/pregnancies list, PATCH /api/pregnancies/{id}, POST /api/pregnancies/{id}/found) are NOT implemented in /app/backend/server.py — verified by both curl (405/405/404) and a new 9-test pytest module /app/backend/tests/test_iteration4_pregnancies.py which fails 7/9 with `Method Not Allowed`. The DHIS2 NEG/POS normalisation IS implemented (server.py:588-591) and the new test `test_neg_pos_counted` PASSES, confirming CPN visits with hiv_status='POS'/syphilis_status='NEG' increment DE_VIH_TESTED/DE_VIH_POS/DE_SYPH_TESTED. Frontend files (PregnanciesList.jsx, PregnancyCard.jsx, CPNForm.jsx, pregnancyCalc.js, AppLayout nav link, App.js route /app/soignant/grossesses) all exist but cannot work without the backend endpoints. Full regression suite (46 prior tests) still PASSES — no regression. Iteration 4 backend is essentially missing.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/pregnancies", "issue": "Endpoint not implemented. Returns 405 Method Not Allowed. The current router only declares POST /pregnancies and GET /pregnancies/{id}. The required list endpoint with nested patient + last_cpn projection is absent.", "priority": "CRITICAL"},
+      {"endpoint": "PATCH /api/pregnancies/{id}", "issue": "Endpoint not implemented. Returns 405. No status-update route exists; UI 'Marquer perdue de vue' and 'mark-ltfu-{id}' actions will fail.", "priority": "CRITICAL"},
+      {"endpoint": "POST /api/pregnancies/{id}/found", "issue": "Endpoint not implemented. Returns 404. UI 'Marquer retrouvée' (mark-found-{id}) action will fail.", "priority": "CRITICAL"},
+      {"endpoint": "POST /api/pregnancies", "issue": "Still hard-codes status='active' (server.py:273) instead of the new canonical 'en_cours'. Spec says new pregnancies should default to 'en_cours'. analytics/overview already tolerates both via $in [active, en_cours], but PregnancyCard status badge will read 'active' (no French label mapping for it) instead of 'En cours'.", "priority": "HIGH"},
+      {"endpoint": "POST /api/cpn-visits", "issue": "No auto-creation of next appointment when client requests it. Spec requires the frontend 'cpn-auto-schedule' checkbox to result in an automatically created appointment (type='CPN', notes startswith 'Auto-planifié'). Currently this must be done client-side via a second POST /appointments call — verify CPNForm.jsx actually does this; otherwise the auto-schedule promise is broken.", "priority": "MEDIUM"}
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Pregnancies list page (/app/soignant/grossesses)", "issue": "Page will crash or render empty: it calls GET /api/pregnancies which returns 405 — no list, no KPIs, no cards. Cannot be verified end-to-end until backend lands.", "affected_selectors": ["[data-testid='filter-all']", "[data-testid^='pregnancy-card-']", "[data-testid='nav-soignant-pregnancies']"]},
+      {"flow": "Mark perdue-de-vue / Marquer retrouvée", "issue": "Both UI actions call PATCH/POST endpoints that do not exist on the backend — silent failure or toast error guaranteed.", "affected_selectors": ["[data-testid^='mark-ltfu-']", "[data-testid^='mark-found-']"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration4_pregnancies.py",
+    "/app/test_reports/pytest/iteration4_results.xml",
+    "/app/test_reports/pytest/iteration4_regression.xml"
+  ],
+  "action_items": [
+    "Implement GET /api/pregnancies in /app/backend/server.py: soignant returns pregnancies whose patient.zone_id == user.zone_id; admin returns all; patient returns 403. Each row must nest `patient` (id, full_name, phone, address, zone_id) and `last_cpn` (visit_number, visit_date, hemoglobin, ...) — last_cpn = most recent cpn_visit by visit_date or visit_number.",
+    "Implement PATCH /api/pregnancies/{id} for soignant/admin accepting body {status, found_at?, ...}; allowed statuses: en_cours, perdue_vue, accouchee, fausse_couche, ivg, transferee. Return 404 if id missing.",
+    "Implement POST /api/pregnancies/{id}/found that sets status='en_cours' and found_at=now_iso(). 404 for missing.",
+    "Change POST /api/pregnancies default status from 'active' to 'en_cours' (server.py:273) so new pregnancies match the new vocabulary used by PregnancyCard.STATUS_COLORS.",
+    "Optionally: backfill existing pregnancies with status='active' → 'en_cours' (one-time migration), or ensure PregnancyCard renders the legacy 'active' value as 'En cours'.",
+    "Verify CPNForm.jsx actually posts a second /api/appointments call when 'cpn-auto-schedule' is checked, with type='CPN' and notes startswith 'Auto-planifié' — backend doesn't auto-create it.",
+    "Re-run pytest /app/backend/tests/test_iteration4_pregnancies.py after fixes — should be 9/9. Then re-run full suite for 55/55."
+  ],
+  "critical_code_review_comments": [
+    "server.py has grown to ~912 lines and still mixes routers; iteration 4 will push it further. Strongly recommend splitting into backend/routers/{auth,patients,pregnancies,cpn,mpdsr,analytics,dhis2}.py before adding more endpoints.",
+    "Status vocabulary is now duplicated: server uses 'active' on POST /pregnancies, analytics tolerates both 'active' and 'en_cours', frontend STATUS_COLORS expects the new vocabulary. Centralise allowed statuses in models.py as an Enum and reference it from both POST and PATCH validators.",
+    "DHIS2 NEG/POS normalisation is implemented in server.py:588-591 by inlining literal lists. Extract to a constant like HIV_TESTED_VALUES=['negatif','positif','NEG','POS'] to avoid divergence between indicators / export / CSV paths.",
+    "POST /cpn-visits has no business rule for 'CPN1 tardive (>12 SA)' detection on the backend — currently this is only a UI hint. If the MSP report ever needs it, add a server-side `late_cpn1` boolean computed from lmp_date + visit_date.",
+    "No tests yet for /api/pregnancies, /api/pregnancies/{id}/found because those endpoints don't exist. Once added, also add a test verifying patient role gets 403 on the new list endpoint (the integration test is already in test_iteration4_pregnancies.py).",
+    "CORS still allow_origins=['*'] + allow_credentials=True (carried over). Browsers reject credentials with wildcard origins."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration4_pregnancies.py (new — 9 tests, 2 pass, 7 fail expected until backend endpoints land)"
+  ],
+  "success_rate": {
+    "backend": "regression 46/46 PASS (100%); iteration 4 new = 2/9 PASS (22%) — 7 failures all caused by missing endpoints",
+    "frontend": "not exhaustively verified — page would not render meaningful content without backend; files & route & nav link confirmed to exist"
+  },
+  "test_credentials": "admin@khalaba.health/khalaba2026, sagefemme@khalaba.health/khalaba2026, maman@khalaba.health/khalaba2026 (from /app/memory/test_credentials.md, OTP is simulated and returned by /auth/login as `otp_code`)",
+  "seed_data_creation": "TestPregnancyPatch and TestDhis2NegPosNormalisation will create extra pregnancies (lmp 2025-06-01 / 2025-08-01) and one CPN visit (2026-02-12, hiv=POS, syph=NEG) under the soignant zone — only the NEG/POS test actually succeeded today and persisted data.",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Run: REACT_APP_BACKEND_URL=https://dev-build-127.preview.emergentagent.com pytest /app/backend/tests/ -v — after E1 implements the three missing /pregnancies endpoints, this should reach 55/55 (46 regression + 9 iter4). The NEG/POS normalisation is already verified working. Frontend testing of /app/soignant/grossesses, PregnancyCard banners (overdue >7d / >14d), 'cpn-who-block' WHO calculations, 'cpn-late-alert', 'cpn-anemia-hint', and the 'cpn-auto-schedule' auto-appointment flow is still TODO once the backend lands; use the seeded maman (lmp 2025-06-01 → ~38 SA today) as the test subject.",
+  "rca of the issue": "Root cause: E1 implemented the frontend half of iteration 4 (PregnanciesList.jsx, PregnancyCard.jsx, CPNForm.jsx with WHO block, pregnancyCalc.js with Naegele/WHO_CPN_SCHEDULE, App.js route, AppLayout nav link) and the DHIS2 NEG/POS normalisation in the indicator queries, but never added the three new pregnancy endpoints to backend/server.py. Verified by `grep -n 'pregnancies' server.py` showing only POST /pregnancies + GET /pregnancies/{pregnancy_id} — no list, no PATCH, no /found. Reproduction: curl -i GET/PATCH/POST against the public URL returns 405/405/404 respectively. Mitigation: add the three endpoints + flip default status to 'en_cours' (see action_items)."
+}

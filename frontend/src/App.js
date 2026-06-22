@@ -16,6 +16,7 @@ import PatientBaby from "@/pages/patient/PatientBaby";
 
 import SoignantDashboard from "@/pages/soignant/SoignantDashboard";
 import PatientList from "@/pages/soignant/PatientList";
+import PregnanciesList from "@/pages/soignant/PregnanciesList";
 import PatientDetail from "@/pages/soignant/PatientDetail";
 import NewPatient from "@/pages/soignant/NewPatient";
 import CPNForm from "@/pages/soignant/CPNForm";
@@ -86,6 +87,7 @@ function App() {
           {/* Soignant routes */}
           <Route path="/app/soignant" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><SoignantDashboard /></AppLayout></ProtectedRoute>} />
           <Route path="/app/soignant/patients" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><PatientList /></AppLayout></ProtectedRoute>} />
+          <Route path="/app/soignant/grossesses" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><PregnanciesList /></AppLayout></ProtectedRoute>} />
           <Route path="/app/soignant/patients/new" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><NewPatient /></AppLayout></ProtectedRoute>} />
           <Route path="/app/soignant/patients/:id" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><PatientDetail /></AppLayout></ProtectedRoute>} />
           <Route path="/app/soignant/patients/:id/cpn" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><CPNForm /></AppLayout></ProtectedRoute>} />

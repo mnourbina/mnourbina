@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useLocation, Link } from "react-router-dom";
 import { toast } from "sonner";
 import api, { formatApiErrorDetail } from "@/lib/api";
@@ -14,7 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Stethoscope, Loader2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Stethoscope, Loader2, AlertTriangle, CalendarClock, Activity } from "lucide-react";
+import { calculateDDR, calculateGestationalAge, getNextCPNDate, formatDateFr, formatDateIso } from "@/lib/pregnancyCalc";
 
 const COMPLICATIONS = [
   "Diabète gestationnel",
@@ -33,6 +34,8 @@ export default function CPNForm() {
   const pregnancyId = location.state?.pregnancyId;
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [pregnancy, setPregnancy] = useState(null);
+  const [autoScheduleNext, setAutoScheduleNext] = useState(true);
   const [form, setForm] = useState({
     visit_number: 1,
     visit_date: new Date().toISOString().slice(0, 10),
@@ -54,6 +57,31 @@ export default function CPNForm() {
     complications: [],
     notes: "",
   });
+
+  // Load pregnancy to extract LMP, previous CPN visits to suggest next visit_number
+  useEffect(() => {
+    if (!pregnancyId) return;
+    api.get(`/pregnancies/${pregnancyId}`).then(r => {
+      setPregnancy(r.data);
+      const done = r.data.cpn_visits?.length || 0;
+      const nextN = Math.min(8, done + 1);
+      const ga = calculateGestationalAge(r.data.lmp_date);
+      setForm(prev => ({
+        ...prev,
+        visit_number: nextN,
+        gestational_age_weeks: ga ? `${ga.weeks}` : prev.gestational_age_weeks,
+      }));
+    }).catch(() => {});
+  }, [pregnancyId]);
+
+  const lmp = pregnancy?.lmp_date;
+  const ga = useMemo(() => calculateGestationalAge(lmp), [lmp]);
+  const ddr = useMemo(() => calculateDDR(lmp), [lmp]);
+  const nextCpn = useMemo(() => getNextCPNDate(lmp, Number(form.visit_number) || 1), [lmp, form.visit_number]);
+  const nextCpnDate = nextCpn?.date instanceof Date ? nextCpn.date : nextCpn instanceof Date ? nextCpn : null;
+  const nextCpnLabel = nextCpn?.label || "Accouchement attendu";
+  const isCpn1Late = Number(form.visit_number) === 1 && ga && ga.weeks > 12;
+  const isAnemia = form.hemoglobin && parseFloat(form.hemoglobin) > 0 && parseFloat(form.hemoglobin) < 11;
 
   const update = (k, v) => setForm(s => ({ ...s, [k]: v }));
   const toggleComp = (c) => setForm(s => ({
@@ -99,6 +127,20 @@ export default function CPNForm() {
       } else {
         toast.success("CPN enregistrée");
       }
+      // Auto-schedule next CPN appointment per WHO schedule
+      if (autoScheduleNext && nextCpnDate && Number(form.visit_number) < 8) {
+        try {
+          const scheduledAt = new Date(nextCpnDate);
+          scheduledAt.setHours(9, 0, 0, 0);
+          await api.post("/appointments", {
+            patient_id: patientId,
+            scheduled_at: scheduledAt.toISOString(),
+            type: "CPN",
+            notes: `Auto-planifié : ${nextCpnLabel}`,
+          });
+          toast.success("Prochain RDV planifié", { description: formatDateFr(nextCpnDate) });
+        } catch (e) { /* non-blocking */ }
+      }
       navigate(`/app/soignant/patients/${patientId}`);
     } catch (e) {
       toast.error("Erreur", { description: formatApiErrorDetail(e.response?.data?.detail) });
@@ -126,6 +168,49 @@ export default function CPNForm() {
       )}
 
       <form onSubmit={submit} className="space-y-6" data-testid="cpn-form">
+        {/* === Bloc OMS : auto-calculs LMP / DDR / GA === */}
+        {lmp && (
+          <div className="bg-white rounded-2xl p-5 border-2 border-[#C85A48]/30 shadow-sm" data-testid="cpn-who-block">
+            <div className="flex items-center gap-2 mb-3">
+              <Activity size={18} className="text-[#C85A48]" />
+              <h3 className="font-heading font-semibold text-[#3E2723]">Calculs OMS — automatiques</h3>
+              <span className="text-xs text-[#795C55] ml-auto">DDR : <strong>{lmp}</strong></span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="bg-[#C85A48]/8 rounded-xl p-3" data-testid="cpn-ga-card">
+                <div className="text-xs text-[#795C55]">Âge gestationnel</div>
+                <div className="font-heading text-2xl font-semibold text-[#C85A48] mt-1">
+                  {ga ? `${ga.weeks} SA + ${ga.days}j` : "—"}
+                </div>
+                {isCpn1Late && (
+                  <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-[#B83A2E] font-medium" data-testid="cpn-late-alert">
+                    <AlertTriangle size={11} /> CPN1 tardive
+                  </div>
+                )}
+              </div>
+              <div className="bg-[#F2C94C]/15 rounded-xl p-3" data-testid="cpn-edd-card">
+                <div className="text-xs text-[#795C55]">DPA (Naegele)</div>
+                <div className="font-heading text-base font-semibold text-[#795C55] mt-1">
+                  {ddr ? ddr.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                </div>
+              </div>
+              <div className="bg-[#4A7C59]/10 rounded-xl p-3 col-span-2 sm:col-span-1" data-testid="cpn-next-card">
+                <div className="text-xs text-[#795C55]">Prochaine CPN recommandée</div>
+                <div className="font-heading text-base font-semibold text-[#4A7C59] mt-1">
+                  {nextCpnDate ? nextCpnDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+                </div>
+                <div className="text-[11px] text-[#795C55] mt-1">{nextCpnLabel}</div>
+              </div>
+            </div>
+            <label className="mt-4 flex items-center gap-3 p-3 rounded-xl bg-[#F7F3EB] cursor-pointer">
+              <Checkbox checked={autoScheduleNext} onCheckedChange={setAutoScheduleNext} data-testid="cpn-auto-schedule" />
+              <span className="text-sm text-[#3E2723]">
+                Programmer automatiquement le prochain rendez-vous {nextCpnDate ? `(${formatDateFr(nextCpnDate)})` : ""}
+              </span>
+              <CalendarClock size={16} className="text-[#795C55] ml-auto" />
+            </label>
+          </div>
+        )}
         {/* Section : identification */}
         <Card title="Identification">
           <Grid cols={3}>
@@ -164,7 +249,12 @@ export default function CPNForm() {
         <Card title="Bilans biologiques">
           <Grid cols={3}>
             <Field label="Hémoglobine (g/dL)">
-              <Input type="number" step="0.1" value={form.hemoglobin} onChange={e => update("hemoglobin", e.target.value)} className="h-11 rounded-xl" data-testid="cpn-hb" />
+              <Input type="number" step="0.1" value={form.hemoglobin} onChange={e => update("hemoglobin", e.target.value)} className={`h-11 rounded-xl ${isAnemia ? "border-[#B83A2E] focus:border-[#B83A2E]" : ""}`} data-testid="cpn-hb" />
+              {isAnemia && (
+                <div className="mt-1 inline-flex items-center gap-1 text-xs text-[#B83A2E] font-medium" data-testid="cpn-anemia-hint">
+                  <AlertTriangle size={11} /> Anémie détectée — Fer + Acide folique
+                </div>
+              )}
             </Field>
             <Field label="Protéinurie">
               <Select value={form.proteinuria} onValueChange={(v) => update("proteinuria", v)}>
@@ -238,9 +328,9 @@ function StatusField({ label, value, onChange }) {
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="—" /></SelectTrigger>
         <SelectContent>
-          <SelectItem value="negatif">Négatif</SelectItem>
-          <SelectItem value="positif">Positif</SelectItem>
-          <SelectItem value="non_realise">Non réalisé</SelectItem>
+          <SelectItem value="INCONNU">Inconnu</SelectItem>
+          <SelectItem value="NEG">Négatif</SelectItem>
+          <SelectItem value="POS">Positif</SelectItem>
         </SelectContent>
       </Select>
     </Field>

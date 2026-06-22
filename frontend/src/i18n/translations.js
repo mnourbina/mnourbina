@@ -17,6 +17,7 @@ const FR = {
   // Navigation
   "nav.dashboard": "Tableau de bord",
   "nav.patients": "Mes patientes",
+  "nav.pregnancies": "Grossesses actives",
   "nav.agenda": "Agenda",
   "nav.mpdsr": "Surveillance (MPDSR)",
   "nav.pregnancy": "Ma grossesse",
@@ -106,6 +107,7 @@ const EN = {
   notes: "Notes",
   "nav.dashboard": "Dashboard",
   "nav.patients": "My patients",
+  "nav.pregnancies": "Active pregnancies",
   "nav.agenda": "Schedule",
   "nav.mpdsr": "Surveillance (MPDSR)",
   "nav.pregnancy": "My pregnancy",
@@ -189,6 +191,7 @@ const AR = {
   notes: "ملاحظات",
   "nav.dashboard": "لوحة التحكم",
   "nav.patients": "مريضاتي",
+  "nav.pregnancies": "حالات الحمل النشطة",
   "nav.agenda": "المواعيد",
   "nav.mpdsr": "المراقبة (MPDSR)",
   "nav.pregnancy": "حملي",
