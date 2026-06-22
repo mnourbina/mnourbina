@@ -65,7 +65,9 @@ class ZoneIn(BaseModel):
 
 class StructureIn(BaseModel):
     name: str
-    zone_id: str
+    zone_id: str  # legacy name: matches the formal "district_id"
+    district_id: Optional[str] = None  # canonical alias of zone_id (Brique 12)
+    region_id: Optional[str] = None  # denormalised from zone.region_id
     type: Literal["hopital", "centre_sante", "clinique", "case_sante"] = "centre_sante"
     dhis2_org_unit_uid: Optional[str] = None
 

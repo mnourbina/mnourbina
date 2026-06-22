@@ -293,16 +293,31 @@ async def update_zone(zone_id: str, payload: dict, user=Depends(require_role("ad
 
 
 @api.get("/structures")
-async def list_structures(zone_id: Optional[str] = None):
+async def list_structures(zone_id: Optional[str] = None, district_id: Optional[str] = None,
+                          region_id: Optional[str] = None):
     q = {}
-    if zone_id:
-        q["zone_id"] = zone_id
+    # zone_id and district_id are synonyms (district_id is the canonical name introduced in Brique 12)
+    formal_id = district_id or zone_id
+    if formal_id:
+        q["zone_id"] = formal_id
+    if region_id:
+        q["region_id"] = region_id
     return await db.structures.find(q, {"_id": 0}).to_list(500)
 
 
 @api.post("/structures")
 async def create_structure(payload: StructureIn, user=Depends(require_role("admin"))):
-    doc = {"id": new_id(), **payload.model_dump(), "created_at": now_iso()}
+    data = payload.model_dump()
+    # Canonical: ensure zone_id and district_id stay in sync, denormalise region_id
+    canonical = data.get("district_id") or data.get("zone_id")
+    if not canonical:
+        raise HTTPException(400, "zone_id (ou district_id) requis")
+    data["zone_id"] = canonical
+    data["district_id"] = canonical
+    if not data.get("region_id"):
+        z = await db.zones.find_one({"id": canonical}, {"_id": 0, "region_id": 1})
+        data["region_id"] = (z or {}).get("region_id")
+    doc = {"id": new_id(), **data, "created_at": now_iso()}
     await db.structures.insert_one(doc)
     doc.pop('_id', None)
     await audit(user, "CREATE", "Structure", doc["id"], new_data=doc)
@@ -312,9 +327,18 @@ async def create_structure(payload: StructureIn, user=Depends(require_role("admi
 @api.patch("/structures/{structure_id}")
 async def update_structure(structure_id: str, payload: dict, user=Depends(require_role("admin"))):
     allowed = {k: v for k, v in payload.items()
-               if k in {"name", "zone_id", "type", "dhis2_org_unit_uid"}}
+               if k in {"name", "zone_id", "district_id", "region_id", "type", "dhis2_org_unit_uid"}}
     if not allowed:
         raise HTTPException(400, "Aucun champ valide")
+    # Keep zone_id and district_id in sync
+    canonical = allowed.get("district_id") or allowed.get("zone_id")
+    if canonical:
+        allowed["zone_id"] = canonical
+        allowed["district_id"] = canonical
+        # Re-derive region_id when district changes (unless caller overrode it)
+        if "region_id" not in payload:
+            z = await db.zones.find_one({"id": canonical}, {"_id": 0, "region_id": 1})
+            allowed["region_id"] = (z or {}).get("region_id")
     allowed["updated_at"] = now_iso()
     res = await db.structures.update_one({"id": structure_id}, {"$set": allowed})
     if res.matched_count == 0:
@@ -1680,6 +1704,20 @@ async def startup():
         if not z.get("region_id"):
             await db.zones.update_one({"id": z["id"]},
                                        {"$set": {"region_id": region_by_name[name]["id"]}})
+
+    # Brique 12 — denormalise district_id (= zone_id) and region_id on every structure (idempotent)
+    zone_region_map: dict = {}
+    async for z in db.zones.find({}, {"_id": 0, "id": 1, "region_id": 1}):
+        zone_region_map[z["id"]] = z.get("region_id")
+    async for stru in db.structures.find(
+        {"$or": [{"district_id": {"$exists": False}}, {"district_id": None},
+                  {"region_id": {"$exists": False}}, {"region_id": None}]},
+        {"_id": 0, "id": 1, "zone_id": 1, "district_id": 1, "region_id": 1},
+    ):
+        canonical = stru.get("district_id") or stru.get("zone_id")
+        update = {"district_id": canonical, "zone_id": canonical,
+                  "region_id": zone_region_map.get(canonical)}
+        await db.structures.update_one({"id": stru["id"]}, {"$set": update})
 
     # seed structures
     if await db.structures.count_documents({}) == 0:

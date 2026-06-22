@@ -135,6 +135,16 @@ KHALABA is a digital maternal-infant health platform targeting Sub-Saharan Afric
 - ✅ **Frontend** : page admin `/app/admin/audit-logs` (filtres action/entity/user_id, stats top, 200 derniers logs) + éditeur DHIS2 UID inline sur chaque zone dans `/app/admin/config`. Nav link "Journal d'audit"
 - ✅ **92/92 tests pytest passent** (81 anciens + 11 nouveaux test_iteration10_hierarchy_audit.py — regions, zones, structures PATCH, DHIS2 UID resolution avec fallback région, audit log generic + filtres + summary)
 
+## Implemented (Iteration 11 — Feb 28, 2026) — Brique 12 : Hierarchy formal + Region CRUD UI + Twilio doc
+- ✅ **`StructureIn` enrichi** : `district_id` (alias canonique de `zone_id`) + `region_id` (dénormalisé depuis zone.region_id)
+- ✅ **`POST /api/structures`** garde `zone_id`/`district_id` synchronisés et dénormalise `region_id` depuis la zone
+- ✅ **`PATCH /api/structures`** : déplacer une structure d'un district à un autre re-dérive automatiquement `region_id`
+- ✅ **`GET /api/structures`** accepte `district_id` ET `region_id` comme filtres (en plus de `zone_id` legacy)
+- ✅ **Migration au startup** : backfill `district_id` + `region_id` sur toutes les structures existantes (idempotente)
+- ✅ **Page Admin `/app/admin/config` refondue** : 3 sections claires Région → District → Structure. CRUD complet pour Régions (création + édition nom + UID DHIS2), création de districts avec sélecteur de région parente, structures avec sélecteur de district
+- ✅ **Twilio WhatsApp** : skip (option c). Doc complète `/app/backend/TWILIO_INTEGRATION.md` avec étapes credentials + code Python prêt à coller (env vars, sandbox, audit hook)
+- ✅ **97/97 tests pytest passent** (92 anciens + 5 nouveaux test_iteration12_structure_hierarchy.py)
+
 
 
 ## Backlog (P0 → P2)
