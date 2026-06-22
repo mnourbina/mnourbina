@@ -49,16 +49,25 @@ class UserOut(BaseModel):
 
 
 # ---------- Zones / Structures ----------
+class RegionIn(BaseModel):
+    name: str
+    country: str = "Tchad"
+    dhis2_org_unit_uid: Optional[str] = None
+
+
 class ZoneIn(BaseModel):
     name: str
-    region: str
+    region: str  # legacy name string (kept for compat)
+    region_id: Optional[str] = None
     country: str = "Tchad"
+    dhis2_org_unit_uid: Optional[str] = None
 
 
 class StructureIn(BaseModel):
     name: str
     zone_id: str
     type: Literal["hopital", "centre_sante", "clinique", "case_sante"] = "centre_sante"
+    dhis2_org_unit_uid: Optional[str] = None
 
 
 # ---------- Patient & Pregnancy ----------

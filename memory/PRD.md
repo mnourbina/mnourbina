@@ -121,6 +121,20 @@ KHALABA is a digital maternal-infant health platform targeting Sub-Saharan Afric
 - ✅ `index.html` MAJ : title KHALABA, theme-color terracotta, manifest + apple-touch-icon liés
 - ✅ **81/81 tests pytest passent** (76 anciens + 5 nouveaux test_iteration9_pwa.py — manifest, SW, icons, headers offline-replay tolérés)
 
+## Implemented (Iteration 10 — Feb 28, 2026) — Brique 10/11 : Hiérarchie + AuditLog complet + DHIS2 UID
+- ✅ **Modèles enrichis** : `RegionIn` (nouveau), `ZoneIn` étendu (`region_id`, `dhis2_org_unit_uid`), `StructureIn` étendu (`dhis2_org_unit_uid`)
+- ✅ **Endpoints CRUD Regions** : `GET/POST /api/regions`, `PATCH /api/regions/{id}` (admin only)
+- ✅ **PATCH zones/structures** : `PATCH /api/zones/{id}` + `PATCH /api/structures/{id}` pour éditer DHIS2 UID
+- ✅ **Migration auto au startup** : crée les `regions` depuis les strings `region` des zones existantes, back-linke `region_id` sur chaque zone (idempotente)
+- ✅ **`audit()` helper générique** : `audit(user, action, entity, entity_id, new_data, old_data, extra)` — best-effort, jamais bloquant. Indexes audit_logs (action, entity, user_id, created_at).
+- ✅ **Calls audit ajoutés** sur : `CREATE Region/Zone/Structure/Patient/Pregnancy`, `UPDATE Region/Zone/Structure`. Anciens audits préservés (CREATE_CPN_VISIT, DEATH_DECLARED, DEATH_AUDITED, MARKED_FOUND, ASSIGNED_LTFU, EXPORT_DHIS2_REPORT…)
+- ✅ **`/api/audit-logs`** étendu : filtres `action`, `entity`, `user_id`, limit ↑ 100
+- ✅ **`/api/audit-logs/summary`** : compte total + top actions + top entités
+- ✅ **`_resolve_dhis2_org_unit`** (Brique 11) : zone.uid → région.uid → fallback zone_id. Utilisé dans `/api/analytics/dhis2-export` ET `/api/reports/dhis2` → vrai pont SIS national possible
+- ✅ **Refactoring `analytics.py`** : extraction de `UNFPA_TARGETS`, `LTFU_THRESHOLD_DAYS`, `CPN_OMS_WINDOWS`, `next_cpn_overdue`, `DHIS2_INDICATOR_DEFS`, `DHIS2_REPORT_MAPPING`, `patient_ids_in_zone`, `pregnancy_ids_for_patients`, `resolve_dhis2_org_unit`, `compute_dhis2_indicators`. `server.py` passe de 1930 → 1784 lignes
+- ✅ **Frontend** : page admin `/app/admin/audit-logs` (filtres action/entity/user_id, stats top, 200 derniers logs) + éditeur DHIS2 UID inline sur chaque zone dans `/app/admin/config`. Nav link "Journal d'audit"
+- ✅ **92/92 tests pytest passent** (81 anciens + 11 nouveaux test_iteration10_hierarchy_audit.py — regions, zones, structures PATCH, DHIS2 UID resolution avec fallback région, audit log generic + filtres + summary)
+
 
 
 ## Backlog (P0 → P2)

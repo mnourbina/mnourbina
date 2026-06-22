@@ -33,6 +33,7 @@ from models import (
     RegisterIn,
     LoginIn,
     VerifyOtpIn,
+    RegionIn,
     ZoneIn,
     StructureIn,
     PatientIn,
@@ -45,6 +46,18 @@ from models import (
     AppointmentIn,
     new_id,
     now_iso,
+)
+from analytics import (
+    UNFPA_TARGETS,
+    LTFU_THRESHOLD_DAYS,
+    CPN_OMS_WINDOWS as _CPN_OMS_WINDOWS,
+    DHIS2_INDICATOR_DEFS,
+    DHIS2_REPORT_MAPPING,
+    next_cpn_overdue as _next_cpn_overdue,
+    patient_ids_in_zone,
+    pregnancy_ids_for_patients,
+    resolve_dhis2_org_unit,
+    compute_dhis2_indicators,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -69,6 +82,33 @@ def require_role(*roles):
             raise HTTPException(status_code=403, detail="Accès interdit pour ce rôle")
         return user
     return dep
+
+
+# ============================================================
+# Audit log helper (Brique 10 — generic audit trail)
+# ============================================================
+async def audit(user: Optional[dict], action: str, entity: str, entity_id: Optional[str] = None,
+                new_data: Optional[dict] = None, old_data: Optional[dict] = None,
+                extra: Optional[dict] = None) -> None:
+    """Insert a structured audit log entry. Never raises (best-effort)."""
+    try:
+        doc = {
+            "id": new_id(),
+            "user_id": (user or {}).get("id"),
+            "user_email": (user or {}).get("email"),
+            "user_role": (user or {}).get("role"),
+            "action": action,
+            "entity": entity,
+            "entity_id": entity_id,
+            "new_data": new_data,
+            "old_data": old_data,
+            "created_at": now_iso(),
+        }
+        if extra:
+            doc.update(extra)
+        await db.audit_logs.insert_one(doc)
+    except Exception as e:
+        logger.warning("audit log failed for %s/%s: %s", action, entity, e)
 
 
 # ============================================================
@@ -183,8 +223,36 @@ async def me(user=Depends(current_user)):
 
 
 # ============================================================
-# ZONES & STRUCTURES
+# REGIONS / ZONES (= districts) / STRUCTURES (= facilities)
+# Hierarchy: Region → Zone (district sanitaire) → Structure (facility)
 # ============================================================
+@api.get("/regions")
+async def list_regions():
+    return await db.regions.find({}, {"_id": 0}).sort("name", 1).to_list(500)
+
+
+@api.post("/regions")
+async def create_region(payload: RegionIn, user=Depends(require_role("admin"))):
+    doc = {"id": new_id(), **payload.model_dump(), "created_at": now_iso()}
+    await db.regions.insert_one(doc)
+    doc.pop("_id", None)
+    await audit(user, "CREATE", "Region", doc["id"], new_data=doc)
+    return doc
+
+
+@api.patch("/regions/{region_id}")
+async def update_region(region_id: str, payload: dict, user=Depends(require_role("admin"))):
+    allowed = {k: v for k, v in payload.items() if k in {"name", "country", "dhis2_org_unit_uid"}}
+    if not allowed:
+        raise HTTPException(400, "Aucun champ valide")
+    allowed["updated_at"] = now_iso()
+    res = await db.regions.update_one({"id": region_id}, {"$set": allowed})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Région introuvable")
+    await audit(user, "UPDATE", "Region", region_id, new_data=allowed)
+    return await db.regions.find_one({"id": region_id}, {"_id": 0})
+
+
 @api.get("/zones")
 async def list_zones():
     zones = await db.zones.find({}, {"_id": 0}).to_list(500)
@@ -194,9 +262,34 @@ async def list_zones():
 @api.post("/zones")
 async def create_zone(payload: ZoneIn, user=Depends(require_role("admin"))):
     doc = {"id": new_id(), **payload.model_dump(), "created_at": now_iso()}
+    # Auto-link region_id from region name if not supplied
+    if not doc.get("region_id") and doc.get("region"):
+        existing = await db.regions.find_one({"name": doc["region"]}, {"_id": 0})
+        if existing:
+            doc["region_id"] = existing["id"]
+        else:
+            new_region = {"id": new_id(), "name": doc["region"], "country": doc.get("country", "Tchad"),
+                          "dhis2_org_unit_uid": None, "created_at": now_iso()}
+            await db.regions.insert_one(new_region)
+            doc["region_id"] = new_region["id"]
     await db.zones.insert_one(doc)
     doc.pop('_id', None)
+    await audit(user, "CREATE", "Zone", doc["id"], new_data=doc)
     return doc
+
+
+@api.patch("/zones/{zone_id}")
+async def update_zone(zone_id: str, payload: dict, user=Depends(require_role("admin"))):
+    allowed = {k: v for k, v in payload.items()
+               if k in {"name", "region", "region_id", "country", "dhis2_org_unit_uid"}}
+    if not allowed:
+        raise HTTPException(400, "Aucun champ valide")
+    allowed["updated_at"] = now_iso()
+    res = await db.zones.update_one({"id": zone_id}, {"$set": allowed})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Zone introuvable")
+    await audit(user, "UPDATE", "Zone", zone_id, new_data=allowed)
+    return await db.zones.find_one({"id": zone_id}, {"_id": 0})
 
 
 @api.get("/structures")
@@ -212,7 +305,22 @@ async def create_structure(payload: StructureIn, user=Depends(require_role("admi
     doc = {"id": new_id(), **payload.model_dump(), "created_at": now_iso()}
     await db.structures.insert_one(doc)
     doc.pop('_id', None)
+    await audit(user, "CREATE", "Structure", doc["id"], new_data=doc)
     return doc
+
+
+@api.patch("/structures/{structure_id}")
+async def update_structure(structure_id: str, payload: dict, user=Depends(require_role("admin"))):
+    allowed = {k: v for k, v in payload.items()
+               if k in {"name", "zone_id", "type", "dhis2_org_unit_uid"}}
+    if not allowed:
+        raise HTTPException(400, "Aucun champ valide")
+    allowed["updated_at"] = now_iso()
+    res = await db.structures.update_one({"id": structure_id}, {"$set": allowed})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Structure introuvable")
+    await audit(user, "UPDATE", "Structure", structure_id, new_data=allowed)
+    return await db.structures.find_one({"id": structure_id}, {"_id": 0})
 
 
 # ============================================================
@@ -244,6 +352,7 @@ async def create_patient(payload: PatientIn, user=Depends(require_role("soignant
     }
     await db.patients.insert_one(doc)
     doc.pop('_id', None)
+    await audit(user, "CREATE", "Patient", doc["id"], new_data={"full_name": doc.get("full_name"), "zone_id": doc.get("zone_id")})
     return doc
 
 
@@ -278,6 +387,8 @@ async def create_pregnancy(payload: PregnancyIn, user=Depends(require_role("soig
     }
     await db.pregnancies.insert_one(doc)
     doc.pop('_id', None)
+    await audit(user, "CREATE", "Pregnancy", doc["id"],
+                new_data={"patient_id": doc.get("patient_id"), "lmp_date": doc.get("lmp_date")})
     return doc
 
 
@@ -382,49 +493,6 @@ async def get_pregnancy(pregnancy_id: str, user=Depends(current_user)):
 # Brique 7 — Perdues de vue (LTFU) automatique
 # ============================================================
 # OMS: 2 semaines de retard sur la fenêtre OMS = perdue de vue
-LTFU_THRESHOLD_DAYS = 14
-
-# WHO 8-contact ANC schedule windows (mirrors frontend CPN_SCHEDULE_OMS)
-_CPN_OMS_WINDOWS = [
-    {"number": 1, "weekMin": 0,  "weekMax": 12, "label": "CPN1 — 1er trimestre"},
-    {"number": 2, "weekMin": 20, "weekMax": 24, "label": "CPN2 — 2ème trimestre"},
-    {"number": 3, "weekMin": 26, "weekMax": 30, "label": "CPN3 — 2ème trimestre"},
-    {"number": 4, "weekMin": 30, "weekMax": 34, "label": "CPN4 — 3ème trimestre"},
-    {"number": 5, "weekMin": 34, "weekMax": 36, "label": "CPN5 — 3ème trimestre"},
-    {"number": 6, "weekMin": 36, "weekMax": 38, "label": "CPN6 — 3ème trimestre"},
-    {"number": 7, "weekMin": 38, "weekMax": 40, "label": "CPN7 — 3ème trimestre"},
-    {"number": 8, "weekMin": 40, "weekMax": 42, "label": "CPN8 — Post-terme"},
-]
-
-
-def _next_cpn_overdue(lmp_date_str: str, done_numbers: list) -> Optional[dict]:
-    """Port of frontend `getNextCPN()` — returns next CPN slot with daysLate."""
-    if not lmp_date_str:
-        return None
-    try:
-        lmp = datetime.fromisoformat(lmp_date_str)
-    except Exception:
-        return None
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    delta_days = (now - lmp.replace(tzinfo=None)).days
-    weeks = delta_days // 7
-    done = set(done_numbers or [])
-
-    nxt = next(
-        (c for c in _CPN_OMS_WINDOWS if c["weekMin"] <= weeks <= c["weekMax"] and c["number"] not in done),
-        None,
-    )
-    if not nxt:
-        nxt = next((c for c in _CPN_OMS_WINDOWS if c["number"] not in done and c["weekMin"] >= weeks), None)
-    if not nxt:
-        nxt = next((c for c in _CPN_OMS_WINDOWS if c["number"] not in done), None)
-    if not nxt:
-        return None
-
-    days_late = (weeks - nxt["weekMax"]) * 7 if weeks > nxt["weekMax"] else 0
-    return {**nxt, "current_week": weeks, "days_late": days_late}
-
-
 async def _find_asc_for_patient(patient: dict) -> Optional[dict]:
     """V1: any soignant in the same zone acts as ASC.
     V2: dedicated role + geo matching per quartier."""
@@ -1070,17 +1138,11 @@ async def analytics_overview(user=Depends(require_role("admin"))):
 # ============================================================
 # ADMIN KPIs (Brique 5) — UNFPA-aligned high-level indicators
 # ============================================================
-# UNFPA / OMS targets reference:
+# UNFPA / OMS targets are defined in `analytics.UNFPA_TARGETS`
 #   - CPN4 coverage ≥ 75%
 #   - Skilled / assisted birth ≥ 85%
 #   - Anaemia in pregnancy ≤ 20%
 #   - MPDSR audited within 30 days ≥ 95%
-UNFPA_TARGETS = {
-    "cpn4_rate": 75.0,
-    "assisted_birth_rate": 85.0,
-    "anemia_rate": 20.0,         # max acceptable (lower is better)
-    "death_audit_rate": 95.0,
-}
 
 
 @api.get("/admin/kpis")
@@ -1230,102 +1292,22 @@ async def admin_kpis(
 # ============================================================
 # DHIS2 / MSP Indicators
 # ============================================================
-DHIS2_INDICATOR_DEFS = [
-    {"code": "DE_CPN1_TOTAL", "label": "Nombre de CPN1", "formula": "cpn_visits where visit_number == 1", "category": "CPN"},
-    {"code": "DE_CPN4_TOTAL", "label": "Nombre de CPN4+", "formula": "grossesses avec >= 4 cpn_visits", "category": "CPN"},
-    {"code": "DE_ANEMIA_PREG", "label": "Anémie de la grossesse", "formula": "Hb < 11 g/dL", "category": "Biologie"},
-    {"code": "DE_VIH_TESTED", "label": "Femmes testées VIH", "formula": "hiv_status != INCONNU", "category": "VIH"},
-    {"code": "DE_VIH_POS", "label": "VIH positifs", "formula": "hiv_status = positif", "category": "VIH"},
-    {"code": "DE_SYPH_TESTED", "label": "Femmes testées Syphilis", "formula": "syphilis_status != INCONNU", "category": "Syphilis"},
-    {"code": "DE_SYPH_POS", "label": "Syphilis positifs", "formula": "syphilis_status = positif", "category": "Syphilis"},
-    {"code": "DE_MATERNAL_DEATH", "label": "Décès maternels", "formula": "death_type = maternelle", "category": "Mortalité"},
-    {"code": "DE_NEONATAL_DEATH", "label": "Décès néonatals", "formula": "death_type = neonatale", "category": "Mortalité"},
-    {"code": "DE_MPDSR_AUDITED", "label": "MPDSR audités (< 30j)", "formula": "audit_status = audite_en_comite et audit_date - death_date <= 30j", "category": "MPDSR"},
-]
-
-
+# Thin db-bound wrappers — delegate to analytics module
 async def _patient_ids_in_zone(zone_id: Optional[str]):
-    if not zone_id:
-        return None
-    return [p["id"] async for p in db.patients.find({"zone_id": zone_id}, {"id": 1})]
+    return await patient_ids_in_zone(db, zone_id)
 
 
 async def _pregnancy_ids_for_patients(patient_ids):
-    if patient_ids is None:
-        return None
-    return [pr["id"] async for pr in db.pregnancies.find({"patient_id": {"$in": patient_ids}}, {"id": 1})]
+    return await pregnancy_ids_for_patients(db, patient_ids)
+
+
+async def _resolve_dhis2_org_unit(zone_id: Optional[str], default: str = "NATIONAL") -> str:
+    return await resolve_dhis2_org_unit(db, zone_id, default)
 
 
 async def _compute_dhis2_indicators(zone_id: Optional[str], date_from: Optional[str], date_to: Optional[str]) -> dict:
-    patient_ids = await _patient_ids_in_zone(zone_id)
-    pregnancy_ids = await _pregnancy_ids_for_patients(patient_ids)
+    return await compute_dhis2_indicators(db, zone_id, date_from, date_to)
 
-    cpn_q: dict = {}
-    if pregnancy_ids is not None:
-        cpn_q["pregnancy_id"] = {"$in": pregnancy_ids}
-    if date_from or date_to:
-        dq: dict = {}
-        if date_from:
-            dq["$gte"] = date_from
-        if date_to:
-            dq["$lte"] = date_to
-        cpn_q["visit_date"] = dq
-
-    cpn1 = await db.cpn_visits.count_documents({**cpn_q, "visit_number": 1})
-
-    # CPN4+ : grossesses avec >= 4 visites
-    pipeline_cpn4 = [
-        {"$match": cpn_q} if cpn_q else {"$match": {}},
-        {"$group": {"_id": "$pregnancy_id", "count": {"$sum": 1}}},
-        {"$match": {"count": {"$gte": 4}}},
-        {"$count": "n"},
-    ]
-    cpn4_doc = await db.cpn_visits.aggregate(pipeline_cpn4).to_list(1)
-    cpn4 = cpn4_doc[0]["n"] if cpn4_doc else 0
-
-    anemia = await db.cpn_visits.count_documents({**cpn_q, "hemoglobin": {"$lt": 11, "$gt": 0}})
-    vih_tested = await db.cpn_visits.count_documents({**cpn_q, "hiv_status": {"$in": ["negatif", "positif", "NEG", "POS"]}})
-    vih_pos = await db.cpn_visits.count_documents({**cpn_q, "hiv_status": {"$in": ["positif", "POS"]}})
-    syph_tested = await db.cpn_visits.count_documents({**cpn_q, "syphilis_status": {"$in": ["negatif", "positif", "NEG", "POS"]}})
-    syph_pos = await db.cpn_visits.count_documents({**cpn_q, "syphilis_status": {"$in": ["positif", "POS"]}})
-
-    mpdsr_q: dict = {}
-    if patient_ids is not None:
-        mpdsr_q["patient_id"] = {"$in": patient_ids}
-    if date_from or date_to:
-        ddq: dict = {}
-        if date_from:
-            ddq["$gte"] = date_from
-        if date_to:
-            ddq["$lte"] = date_to
-        mpdsr_q["death_date"] = ddq
-
-    maternal_death = await db.mpdsr_reports.count_documents({**mpdsr_q, "death_type": "maternelle"})
-    neonatal_death = await db.mpdsr_reports.count_documents({**mpdsr_q, "death_type": "neonatale"})
-
-    # MPDSR audités < 30 j
-    audited = 0
-    async for r in db.mpdsr_reports.find({**mpdsr_q, "audit_status": "audite_en_comite", "audit_date": {"$ne": None}}, {"_id": 0, "death_date": 1, "audit_date": 1}):
-        try:
-            dd = datetime.fromisoformat(r["death_date"])
-            ad = datetime.fromisoformat(r["audit_date"])
-            if (ad - dd).days <= 30:
-                audited += 1
-        except Exception:
-            continue
-
-    return {
-        "DE_CPN1_TOTAL": cpn1,
-        "DE_CPN4_TOTAL": cpn4,
-        "DE_ANEMIA_PREG": anemia,
-        "DE_VIH_TESTED": vih_tested,
-        "DE_VIH_POS": vih_pos,
-        "DE_SYPH_TESTED": syph_tested,
-        "DE_SYPH_POS": syph_pos,
-        "DE_MATERNAL_DEATH": maternal_death,
-        "DE_NEONATAL_DEATH": neonatal_death,
-        "DE_MPDSR_AUDITED": audited,
-    }
 
 
 @api.get("/analytics/dhis2-indicators")
@@ -1396,10 +1378,11 @@ async def dhis2_export_json(
     last = (last - timedelta(days=1)).isoformat()
 
     values = await _compute_dhis2_indicators(zone_id, first, last)
+    org_unit = await _resolve_dhis2_org_unit(zone_id, "NATIONAL")
     payload = {
         "dataSet": "KHALABA_MNCH_MONTHLY",
         "period": period,
-        "orgUnit": zone_id or "NATIONAL",
+        "orgUnit": org_unit,
         "attributeOptionCombo": "default",
         "dataValues": [
             {"dataElement": d["code"], "value": str(values.get(d["code"], 0))}
@@ -1423,8 +1406,42 @@ async def dhis2_export_json(
 
 
 @api.get("/audit-logs")
-async def list_audit_logs(limit: int = 50, user=Depends(require_role("admin"))):
-    return await db.audit_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(limit)
+async def list_audit_logs(
+    limit: int = 100,
+    action: Optional[str] = None,
+    entity: Optional[str] = None,
+    user_id: Optional[str] = None,
+    user=Depends(require_role("admin")),
+):
+    q: dict = {}
+    if action:
+        q["action"] = action
+    if entity:
+        q["entity"] = entity
+    if user_id:
+        q["user_id"] = user_id
+    return await db.audit_logs.find(q, {"_id": 0}).sort("created_at", -1).to_list(limit)
+
+
+@api.get("/audit-logs/summary")
+async def audit_logs_summary(user=Depends(require_role("admin"))):
+    """Aggregated audit log counts by action and entity."""
+    by_action = []
+    async for r in db.audit_logs.aggregate([
+        {"$group": {"_id": "$action", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 25},
+    ]):
+        by_action.append({"action": r["_id"], "count": r["count"]})
+    by_entity = []
+    async for r in db.audit_logs.aggregate([
+        {"$group": {"_id": "$entity", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 25},
+    ]):
+        by_entity.append({"entity": r["_id"], "count": r["count"]})
+    total = await db.audit_logs.count_documents({})
+    return {"total": total, "by_action": by_action, "by_entity": by_entity}
 
 
 @api.get("/reports/district")
@@ -1502,19 +1519,7 @@ async def district_monthly_report(
     }
 
 
-# Brique 8 — DHIS2 DataValueSet export (simplified mapping aligned with district report cards)
-DHIS2_REPORT_MAPPING = {
-    "ANC_Registered":     ("totalPregnancies",  "ANC1"),
-    "ANC1_Visits":        ("cpn1",              "ANC1_VISIT"),
-    "ANC4_Visits":        ("cpn4",              "ANC4_VISIT"),
-    "Deliveries_Facility":("assistedBirths",    "DEL_FACILITY"),
-    "Anemia_Screened":    ("anemiaScreened",    "ANEMIA_SCR"),
-    "Anemia_Cases":       ("anemiaCases",       "ANEMIA_CASE"),
-    "HIV_Tested":         ("hivTested",         "HIV_TEST"),
-    "HIV_Positive":       ("hivPositive",       "HIV_POS"),
-    "Maternal_Deaths":    ("maternalDeaths",    "MAT_DEATH"),
-    "Neonatal_Deaths":    ("neonatalDeaths",    "NEO_DEATH"),
-}
+# Brique 8 — DHIS2 DataValueSet export uses `DHIS2_REPORT_MAPPING` from `analytics`.
 
 
 @api.get("/reports/dhis2")
@@ -1537,11 +1542,12 @@ async def reports_dhis2_export(
             "categoryOptionCombo": "DEFAULT",
             "value": str(ind.get(ind_field, 0)),
         })
+    org_unit = await _resolve_dhis2_org_unit(zone_id, "DISTRICT_ORG_UNIT_ID")
     payload = {
         "dataSet": "MATERNAL_HEALTH_MONTHLY",
         "completeDate": datetime.now(timezone.utc).date().isoformat(),
         "period": period,
-        "orgUnit": zone_id or "DISTRICT_ORG_UNIT_ID",
+        "orgUnit": org_unit,
         "attributeOptionCombo": "DEFAULT",
         "dataValues": data_values,
     }
@@ -1633,6 +1639,12 @@ async def startup():
     await db.vaccinations.create_index("child_id")
     await db.zones.create_index("id", unique=True)
     await db.structures.create_index("id", unique=True)
+    await db.regions.create_index("id", unique=True)
+    await db.regions.create_index("name")
+    await db.audit_logs.create_index([("created_at", -1)])
+    await db.audit_logs.create_index("action")
+    await db.audit_logs.create_index("entity")
+    await db.audit_logs.create_index("user_id")
     await db.otp_codes.create_index("user_id", unique=True)
     await db.alerts.create_index("pregnancy_id")
     await db.alerts.create_index([("created_at", -1)])
@@ -1650,6 +1662,24 @@ async def startup():
         ]
         for z in default_zones:
             await db.zones.insert_one({"id": new_id(), **z, "created_at": now_iso()})
+
+    # Brique 10 — auto-derive regions from zones (idempotent migration)
+    region_by_name: dict = {}
+    async for region_doc in db.regions.find({}, {"_id": 0}):
+        region_by_name[region_doc["name"]] = region_doc
+    async for z in db.zones.find({}, {"_id": 0}):
+        name = z.get("region")
+        if not name:
+            continue
+        if name not in region_by_name:
+            new_region = {"id": new_id(), "name": name, "country": z.get("country", "Tchad"),
+                          "dhis2_org_unit_uid": None, "created_at": now_iso()}
+            await db.regions.insert_one(new_region)
+            region_by_name[name] = new_region
+        # Back-link region_id on zone if missing
+        if not z.get("region_id"):
+            await db.zones.update_one({"id": z["id"]},
+                                       {"$set": {"region_id": region_by_name[name]["id"]}})
 
     # seed structures
     if await db.structures.count_documents({}) == 0:

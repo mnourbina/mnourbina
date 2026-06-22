@@ -64,11 +64,12 @@ class TestDhis2Report:
     def test_dhis2_report_zone_filter(self, adm):
         s, _ = adm
         zones = s.get(f"{API}/zones", timeout=15).json()
-        zid = zones[0]["id"]
+        z = zones[0]
+        expected = z.get("dhis2_org_unit_uid") or z["id"]
         r = s.get(f"{API}/reports/dhis2",
-                  params={"month": 6, "year": 2026, "zone_id": zid}, timeout=15)
+                  params={"month": 6, "year": 2026, "zone_id": z["id"]}, timeout=15)
         assert r.status_code == 200
-        assert r.json()["orgUnit"] == zid
+        assert r.json()["orgUnit"] == expected
 
     def test_dhis2_report_forbidden_for_soignant(self, soig):
         s, _ = soig
@@ -82,9 +83,9 @@ class TestDhis2Report:
 
     def test_dhis2_report_creates_audit_log(self, adm):
         s, _ = adm
-        before = s.get(f"{API}/audit-logs", params={"limit": 50}, timeout=15).json()
-        before_count = sum(1 for a in before if a.get("action") == "EXPORT_DHIS2_REPORT")
+        before = s.get(f"{API}/audit-logs",
+                       params={"action": "EXPORT_DHIS2_REPORT", "limit": 500}, timeout=15).json()
         s.get(f"{API}/reports/dhis2", params={"month": 6, "year": 2026}, timeout=15)
-        after = s.get(f"{API}/audit-logs", params={"limit": 50}, timeout=15).json()
-        after_count = sum(1 for a in after if a.get("action") == "EXPORT_DHIS2_REPORT")
-        assert after_count > before_count, "EXPORT_DHIS2_REPORT audit log not created"
+        after = s.get(f"{API}/audit-logs",
+                      params={"action": "EXPORT_DHIS2_REPORT", "limit": 500}, timeout=15).json()
+        assert len(after) > len(before), "EXPORT_DHIS2_REPORT audit log not created"

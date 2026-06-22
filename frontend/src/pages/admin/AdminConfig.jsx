@@ -70,12 +70,7 @@ export default function AdminConfig() {
             </Button>
           </form>
           <ul className="divide-y divide-[#3E2723]/5">
-            {zones.map(z => (
-              <li key={z.id} className="py-3">
-                <div className="font-medium text-[#3E2723]">{z.name}</div>
-                <div className="text-sm text-[#795C55]">{z.region} · {z.country}</div>
-              </li>
-            ))}
+            {zones.map(z => <ZoneRow key={z.id} z={z} onUpdate={reload} />)}
           </ul>
         </section>
 
@@ -113,5 +108,47 @@ export default function AdminConfig() {
         </section>
       </div>
     </div>
+  );
+}
+
+function ZoneRow({ z, onUpdate }) {
+  const [uid, setUid] = useState(z.dhis2_org_unit_uid || "");
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    if ((z.dhis2_org_unit_uid || "") === uid) return;
+    setSaving(true);
+    try {
+      await api.patch(`/zones/${z.id}`, { dhis2_org_unit_uid: uid || null });
+      toast.success("UID DHIS2 mis à jour");
+      onUpdate?.();
+    } catch (e) {
+      toast.error(formatApiErrorDetail(e.response?.data?.detail));
+    } finally { setSaving(false); }
+  };
+  return (
+    <li className="py-3 space-y-2" data-testid={`zone-row-${z.id}`}>
+      <div>
+        <div className="font-medium text-[#3E2723]">{z.name}</div>
+        <div className="text-sm text-[#795C55]">{z.region} · {z.country}</div>
+      </div>
+      <div className="flex gap-2 items-center">
+        <Input
+          value={uid}
+          onChange={(e) => setUid(e.target.value)}
+          placeholder="UID DHIS2 (org unit)"
+          className="h-9 rounded-lg text-xs flex-1"
+          data-testid={`zone-dhis2-uid-${z.id}`}
+        />
+        <Button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          className="h-9 px-3 rounded-lg text-xs bg-[#3E2723] hover:bg-[#2a1c1a]"
+          data-testid={`zone-dhis2-save-${z.id}`}
+        >
+          {saving ? <Loader2 size={12} className="animate-spin" /> : "Enregistrer"}
+        </Button>
+      </div>
+    </li>
   );
 }

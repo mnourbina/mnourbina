@@ -23,6 +23,7 @@ import {
   Activity,
   FileBarChart,
   Search,
+  History,
 } from "lucide-react";
 
 const navByRole = (t) => ({
@@ -31,6 +32,7 @@ const navByRole = (t) => ({
     { to: "/app/admin/ltfu", icon: Search, label: "Perdues de vue", testid: "nav-admin-ltfu" },
     { to: "/app/admin/report", icon: FileBarChart, label: "Rapport mensuel", testid: "nav-admin-report" },
     { to: "/app/admin/indicators", icon: Activity, label: t("nav.indicators"), testid: "nav-admin-indicators" },
+    { to: "/app/admin/audit-logs", icon: History, label: "Journal d'audit", testid: "nav-admin-audit" },
     { to: "/app/admin/config", icon: Settings, label: t("nav.config"), testid: "nav-admin-config" },
   ],
   soignant: [

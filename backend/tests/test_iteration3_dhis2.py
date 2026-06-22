@@ -214,11 +214,14 @@ class TestDhis2Export:
 
     def test_zone_id_used_as_orgunit(self, admin_session, seeded_data):
         s, _ = admin_session
+        zone = s.get(f"{API}/zones", timeout=15).json()
+        z = next((z for z in zone if z["id"] == seeded_data["zone_id"]), None)
+        expected = (z or {}).get("dhis2_org_unit_uid") or seeded_data["zone_id"]
         r = s.get(f"{API}/analytics/dhis2-export",
                   params={"period": "202602", "zone_id": seeded_data["zone_id"]},
                   timeout=20)
         assert r.status_code == 200
-        assert r.json()["orgUnit"] == seeded_data["zone_id"]
+        assert r.json()["orgUnit"] == expected
 
     def test_invalid_period_length(self, admin_session):
         s, _ = admin_session
