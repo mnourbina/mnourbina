@@ -637,9 +637,13 @@ async def dhis2_indicators(
     user=Depends(require_role("admin")),
 ):
     # period (YYYYMM, DHIS2 standard) overrides date_from / date_to
-    if period and len(period) == 6:
+    if period:
+        if len(period) != 6 or not period.isdigit():
+            raise HTTPException(400, "Format période invalide. Utiliser YYYYMM (ex: 202610)")
         year = int(period[:4])
         month = int(period[4:])
+        if month < 1 or month > 12:
+            raise HTTPException(400, "Mois invalide dans la période")
         first = datetime(year, month, 1).date().isoformat()
         if month == 12:
             last = datetime(year + 1, 1, 1).date()
@@ -698,7 +702,7 @@ async def dhis2_export_json(
         "orgUnit": zone_id or "NATIONAL",
         "attributeOptionCombo": "default",
         "dataValues": [
-            {"dataElement": d["code"], "value": values.get(d["code"], 0)}
+            {"dataElement": d["code"], "value": str(values.get(d["code"], 0))}
             for d in DHIS2_INDICATOR_DEFS
         ],
         "completeDate": datetime.now(timezone.utc).date().isoformat(),

@@ -47,6 +47,16 @@ KHALABA is a digital maternal-infant health platform targeting Sub-Saharan Afric
 - ✅ Patient agenda grouped into Upcoming / Past with status badges
 - ✅ Multilingual FR / EN / AR with full RTL flip (sidebar position, html dir, text alignment), persistent in localStorage
 
+## Implemented (Iteration 3 — Feb 28, 2026) — DHIS2 / MSP
+- ✅ 10 official MSP/DHIS2 indicators covered: DE_CPN1_TOTAL, DE_CPN4_TOTAL, DE_ANEMIA_PREG, DE_VIH_TESTED, DE_VIH_POS, DE_SYPH_TESTED, DE_SYPH_POS, DE_MATERNAL_DEATH, DE_NEONATAL_DEATH, DE_MPDSR_AUDITED
+- ✅ `GET /api/analytics/dhis2-indicators?period=YYYYMM&zone_id=` — returns indicators table
+- ✅ `GET /api/analytics/dhis2-export?period=YYYYMM` — returns official DHIS2 DataValueSet JSON (dataSet: `KHALABA_MNCH_MONTHLY`, period, orgUnit, attributeOptionCombo, dataValues[].value as string, completeDate) — spec compliant
+- ✅ `GET /api/analytics/dhis2-indicators/export.csv` — CSV export for Excel
+- ✅ `GET /api/audit-logs` — every DHIS2 export is audit-logged (user, period, zone, values summary)
+- ✅ MPDSR form extended with `audit_status` (Non audité / En attente / Audité en comité) + `audit_date`, used for DE_MPDSR_AUDITED (<30 days from death)
+- ✅ Admin "Indicateurs MSP" page (`/app/admin/indicators`): filter (period + zone), table 10 indicators, bar chart, JSON preview + copy/download buttons
+- ✅ 46/46 backend tests passing
+
 ## Backlog (P0 → P2)
 - P1: Appointments scheduler with calendar UI (model exists, UI is a list)
 - P1: Patient portal — display her own CPN visits, vaccination calendar of her baby
