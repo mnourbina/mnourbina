@@ -355,6 +355,23 @@ async def get_pregnancy(pregnancy_id: str, user=Depends(current_user)):
 # ============================================================
 # CPN VISITS
 # ============================================================
+async def _enqueue_sync(table_name: str, record_id: str, action: str, payload: dict) -> None:
+    """Brique 2 — SyncQueue scaffold for offline-first replication.
+    Persists a sync intent that an offline client / replication worker can consume.
+    """
+    safe_payload = {k: v for k, v in payload.items() if k != "_id"}
+    await db.sync_queue.insert_one({
+        "id": new_id(),
+        "table_name": table_name,
+        "record_id": record_id,
+        "action": action,
+        "payload": safe_payload,
+        "created_at": now_iso(),
+        "synced_at": None,
+        "retry_count": 0,
+    })
+
+
 async def _check_and_persist_alerts(cpn: dict) -> list:
     """MSP-grade alert checker, faithful port of the reference checkAlerts."""
     alerts_to_create = []
@@ -431,6 +448,10 @@ async def create_cpn(payload: CPNVisitIn, user=Depends(require_role("soignant", 
     # MSP-grade persistent alerts
     persisted = await _check_and_persist_alerts(doc)
     doc["msp_alerts"] = persisted
+    # Brique 2 — SyncQueue (offline-first replication)
+    await _enqueue_sync("Consultation", doc["id"], "CREATE", doc)
+    for alert in persisted:
+        await _enqueue_sync("Alert", alert["id"], "CREATE", alert)
     return doc
 
 
@@ -498,7 +519,36 @@ async def update_alert(alert_id: str, payload: dict, user=Depends(require_role("
     res = await db.alerts.update_one({"id": alert_id}, {"$set": update})
     if res.matched_count == 0:
         raise HTTPException(404, "Alerte introuvable")
-    return await db.alerts.find_one({"id": alert_id}, {"_id": 0})
+    doc = await db.alerts.find_one({"id": alert_id}, {"_id": 0})
+    await _enqueue_sync("Alert", alert_id, "UPDATE", doc)
+    return doc
+
+
+# ============================================================
+# SYNC QUEUE (Brique 2 — offline-first scaffold)
+# ============================================================
+@api.get("/sync-queue")
+async def list_sync_queue(
+    pending_only: bool = True,
+    limit: int = 200,
+    user=Depends(require_role("admin")),
+):
+    q = {"synced_at": None} if pending_only else {}
+    rows = await db.sync_queue.find(q, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    total = await db.sync_queue.count_documents({})
+    pending = await db.sync_queue.count_documents({"synced_at": None})
+    return {"total": total, "pending": pending, "items": rows}
+
+
+@api.post("/sync-queue/{queue_id}/mark-synced")
+async def mark_synced(queue_id: str, user=Depends(require_role("admin"))):
+    res = await db.sync_queue.update_one(
+        {"id": queue_id},
+        {"$set": {"synced_at": now_iso()}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(404, "Entrée introuvable")
+    return {"ok": True}
 
 
 # ============================================================
@@ -984,6 +1034,8 @@ async def startup():
     await db.otp_codes.create_index("user_id", unique=True)
     await db.alerts.create_index("pregnancy_id")
     await db.alerts.create_index([("created_at", -1)])
+    await db.sync_queue.create_index([("created_at", -1)])
+    await db.sync_queue.create_index("synced_at")
 
     # seed zones
     if await db.zones.count_documents({}) == 0:
