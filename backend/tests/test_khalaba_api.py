@@ -253,6 +253,13 @@ def test_vaccination_flow(soignant_session, created_child):
 # ------------- MPDSR -------------
 def test_mpdsr_create_and_list(soignant_session):
     s, _ = soignant_session
+    # Clear any leftover pending audit from previous iteration tests (MSP blocking workflow)
+    pending = s.get(f"{API}/auth/pending-audit", timeout=15).json().get("pending")
+    if pending:
+        s.post(f"{API}/mpdsr/{pending['id']}/complete-audit", json={
+            "delay1_recours": False, "delay2_acces": False, "delay3_prise_charge": False,
+            "preventable": False, "preventive_actions": "test cleanup",
+        }, timeout=15)
     payload = {
         "death_type": "maternelle",
         "death_date": "2026-01-15",
@@ -263,6 +270,10 @@ def test_mpdsr_create_and_list(soignant_session):
     }
     r = s.post(f"{API}/mpdsr", json=payload, timeout=20)
     assert r.status_code == 200, r.text
+    body = r.json()
+    # New MSP-enforced response wraps the death + must_complete_audit flag
+    if "death" in body:
+        assert body["must_complete_audit"] is True
     r2 = s.get(f"{API}/mpdsr", timeout=20)
     assert r2.status_code == 200
     assert isinstance(r2.json(), list)

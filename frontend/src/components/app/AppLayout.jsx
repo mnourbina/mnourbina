@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useI18n } from "@/i18n/I18nContext";
 import Logo from "./Logo";
 import LanguageToggle from "./LanguageToggle";
+import AuditGate from "./AuditGate";
 import {
   LayoutDashboard,
   Users,
@@ -140,7 +141,7 @@ export default function AppLayout({ children }) {
           <div className="w-6" />
         </header>
         <main className="p-4 md:p-8 max-w-7xl mx-auto" data-testid="app-main">
-          {children}
+          <AuditGate>{children}</AuditGate>
         </main>
       </div>
     </div>

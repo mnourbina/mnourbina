@@ -109,6 +109,13 @@ def seeded_data(soignant_session, admin_session):
     }, timeout=15)
     assert v2.status_code in (200, 201), v2.text
 
+    # Clear any pending audit (MSP blocking workflow)
+    pending = s_soig.get(f"{API}/auth/pending-audit", timeout=15).json().get("pending")
+    if pending:
+        s_soig.post(f"{API}/mpdsr/{pending['id']}/complete-audit", json={
+            "delay1_recours": False, "delay2_acces": False, "delay3_prise_charge": False,
+            "preventable": False, "preventive_actions": "test cleanup",
+        }, timeout=15)
     # MPDSR maternal death 2026-02-10 audited 2026-02-25 (15j)
     m = s_soig.post(f"{API}/mpdsr", json={
         "patient_id": patient_id,
@@ -121,6 +128,14 @@ def seeded_data(soignant_session, admin_session):
         "audit_date": "2026-02-25",
     }, timeout=15)
     assert m.status_code in (200, 201), m.text
+    # The new wrapper format: extract death id and complete audit so the next test isn't blocked
+    death_id = (m.json().get("death") or m.json()).get("id")
+    if death_id:
+        s_soig.post(f"{API}/mpdsr/{death_id}/complete-audit", json={
+            "delay1_recours": False, "delay2_acces": False, "delay3_prise_charge": False,
+            "preventable": False, "preventive_actions": "audited via fixture",
+            "audit_date": "2026-02-25",
+        }, timeout=15)
 
     return {"zone_id": zone_id, "patient_id": patient_id, "pregnancy_id": pregnancy_id}
 
@@ -277,7 +292,13 @@ class TestDhis2Csv:
 class TestMpdsrAuditFields:
     def test_create_mpdsr_with_audit(self, soignant_session):
         s, _ = soignant_session
-        # Pick any existing patient in zone (use one from list)
+        # Clear pending audit from previous tests (MSP blocking workflow)
+        pending = s.get(f"{API}/auth/pending-audit", timeout=15).json().get("pending")
+        if pending:
+            s.post(f"{API}/mpdsr/{pending['id']}/complete-audit", json={
+                "delay1_recours": False, "delay2_acces": False, "delay3_prise_charge": False,
+                "preventable": False, "preventive_actions": "test cleanup",
+            }, timeout=15)
         plist = s.get(f"{API}/patients", timeout=15)
         assert plist.status_code == 200
         patients = plist.json()
@@ -291,12 +312,14 @@ class TestMpdsrAuditFields:
             "place_of_death": "TEST_ Hosp",
             "medical_cause": "Test",
             "summary": "TEST_ audit",
-            "audit_status": "en_attente",
+            "audit_status": "en_attente_audit",
             "audit_date": None,
         }, timeout=15)
         assert r.status_code in (200, 201), r.text
         body = r.json()
-        assert body["audit_status"] == "en_attente"
+        # New wrapper format
+        death = body.get("death", body)
+        assert death["audit_status"] == "en_attente_audit"
 
     def test_mpdsr_list_includes_audit(self, soignant_session):
         s, _ = soignant_session

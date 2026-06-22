@@ -634,10 +634,77 @@ async def list_vaccinations(child_id: str, user=Depends(current_user)):
 # ============================================================
 @api.post("/mpdsr")
 async def create_mpdsr(payload: MPDSRReportIn, user=Depends(require_role("soignant", "admin"))):
-    doc = {"id": new_id(), **payload.model_dump(), "created_at": now_iso(), "created_by": user["id"]}
+    # Brique 4 — Conflict check: block if declarant already has a pending audit
+    pending_q: dict = {
+        "declared_by": user["id"],
+        "audit_status": {"$in": ["en_attente_audit", "en_attente", "non_audite"]},
+    }
+    existing = await db.mpdsr_reports.find_one(pending_q)
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Un décès en attente d'audit existe déjà (id={existing['id']}). Finalisez l'audit avant.",
+        )
+    doc = {"id": new_id(), **payload.model_dump(), "declared_by": user["id"], "created_at": now_iso(), "created_by": user["id"]}
+    if doc.get("audit_status") in (None, "non_audite", "en_attente"):
+        doc["audit_status"] = "en_attente_audit"
     await db.mpdsr_reports.insert_one(doc)
     doc.pop('_id', None)
+    await _enqueue_sync("MaternalNeonatalDeath", doc["id"], "CREATE", doc)
+    # Notify admins (placeholder log + audit log)
+    admins = await db.users.find({"role": "admin"}, {"_id": 0, "email": 1, "name": 1}).to_list(50)
+    logger.warning(f"ALERTE MPDSR · Décès {doc['death_type']} déclaré par {user['name']} le {doc['death_date']}.")
+    await db.audit_logs.insert_one({
+        "id": new_id(), "user_id": user["id"], "user_email": user["email"],
+        "action": "DEATH_DECLARED", "entity": "MaternalNeonatalDeath", "entity_id": doc["id"],
+        "values_summary": {"death_type": doc["death_type"], "death_date": doc["death_date"], "admins": [a.get("email") for a in admins]},
+        "created_at": now_iso(),
+    })
+    return {"death": doc, "must_complete_audit": True,
+            "message": "Déclaration enregistrée. Audit MPDSR obligatoire avant toute autre action."}
+
+
+@api.post("/mpdsr/{death_id}/complete-audit")
+async def complete_mpdsr_audit(death_id: str, payload: dict, user=Depends(require_role("soignant", "admin"))):
+    required = ["delay1_recours", "delay2_acces", "delay3_prise_charge", "preventable", "preventive_actions"]
+    missing = [f for f in required if f not in payload]
+    if missing:
+        raise HTTPException(400, f"Champs requis manquants : {', '.join(missing)}")
+    update = {
+        "delay1_recours": bool(payload["delay1_recours"]),
+        "delay2_acces": bool(payload["delay2_acces"]),
+        "delay3_prise_charge": bool(payload["delay3_prise_charge"]),
+        "preventable": bool(payload["preventable"]),
+        "preventive_actions": str(payload["preventive_actions"]),
+        "audit_status": "audite_en_comite",
+        "audit_date": payload.get("audit_date") or datetime.now(timezone.utc).date().isoformat(),
+        "audited_by": user["id"],
+        "audited_at": now_iso(),
+        "updated_at": now_iso(),
+    }
+    res = await db.mpdsr_reports.update_one({"id": death_id}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Déclaration MPDSR introuvable")
+    doc = await db.mpdsr_reports.find_one({"id": death_id}, {"_id": 0})
+    await _enqueue_sync("MaternalNeonatalDeath", death_id, "UPDATE", doc)
+    await db.audit_logs.insert_one({
+        "id": new_id(), "user_id": user["id"], "user_email": user["email"],
+        "action": "DEATH_AUDITED", "entity": "MaternalNeonatalDeath", "entity_id": death_id,
+        "values_summary": {"preventable": doc["preventable"], "delays": {"1": doc["delay1_recours"], "2": doc["delay2_acces"], "3": doc["delay3_prise_charge"]}},
+        "created_at": now_iso(),
+    })
     return doc
+
+
+@api.get("/auth/pending-audit")
+async def my_pending_audit(user=Depends(current_user)):
+    if user["role"] == "patient":
+        return {"pending": None}
+    doc = await db.mpdsr_reports.find_one(
+        {"declared_by": user["id"], "audit_status": {"$in": ["en_attente_audit", "en_attente", "non_audite"]}},
+        {"_id": 0}, sort=[("created_at", -1)],
+    )
+    return {"pending": doc}
 
 
 @api.get("/mpdsr")
