@@ -12,6 +12,7 @@ from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depend
 from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import io
 import csv
 from datetime import datetime, timezone, timedelta
@@ -55,6 +56,7 @@ db = client[os.environ["DB_NAME"]]
 
 app = FastAPI(title="KHALABA API")
 api = APIRouter(prefix="/api")
+scheduler = AsyncIOScheduler()
 
 
 async def current_user(request: Request):
@@ -337,13 +339,30 @@ async def update_pregnancy(pregnancy_id: str, payload: dict, user=Depends(requir
 
 
 @api.post("/pregnancies/{pregnancy_id}/found")
-async def mark_pregnancy_found(pregnancy_id: str, user=Depends(require_role("soignant", "admin"))):
+async def mark_pregnancy_found(pregnancy_id: str, payload: Optional[dict] = None, user=Depends(require_role("soignant", "admin"))):
+    notes = (payload or {}).get("notes") if payload else None
     res = await db.pregnancies.update_one(
         {"id": pregnancy_id},
         {"$set": {"status": "en_cours", "found_at": now_iso(), "updated_at": now_iso()}},
     )
     if res.matched_count == 0:
         raise HTTPException(404, "Grossesse introuvable")
+    # Resolve any open LTFU alert
+    await db.alerts.update_many(
+        {"pregnancy_id": pregnancy_id, "type": "PERDUE_DE_VUE", "is_read": False},
+        {"$set": {"is_read": True, "resolved_at": now_iso()}},
+    )
+    # Audit log
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "user_id": user["id"],
+        "user_email": user["email"],
+        "action": "MARKED_FOUND",
+        "entity": "Pregnancy",
+        "entity_id": pregnancy_id,
+        "new_data": {"notes": notes, "found_at": now_iso()},
+        "created_at": now_iso(),
+    })
     return await db.pregnancies.find_one({"id": pregnancy_id}, {"_id": 0})
 
 
@@ -357,6 +376,210 @@ async def get_pregnancy(pregnancy_id: str, user=Depends(current_user)):
     p["cpn_visits"] = cpn
     p["postnatal_visits"] = postnatal
     return p
+
+
+# ============================================================
+# Brique 7 — Perdues de vue (LTFU) automatique
+# ============================================================
+# OMS: 2 semaines de retard sur la fenêtre OMS = perdue de vue
+LTFU_THRESHOLD_DAYS = 14
+
+# WHO 8-contact ANC schedule windows (mirrors frontend CPN_SCHEDULE_OMS)
+_CPN_OMS_WINDOWS = [
+    {"number": 1, "weekMin": 0,  "weekMax": 12, "label": "CPN1 — 1er trimestre"},
+    {"number": 2, "weekMin": 20, "weekMax": 24, "label": "CPN2 — 2ème trimestre"},
+    {"number": 3, "weekMin": 26, "weekMax": 30, "label": "CPN3 — 2ème trimestre"},
+    {"number": 4, "weekMin": 30, "weekMax": 34, "label": "CPN4 — 3ème trimestre"},
+    {"number": 5, "weekMin": 34, "weekMax": 36, "label": "CPN5 — 3ème trimestre"},
+    {"number": 6, "weekMin": 36, "weekMax": 38, "label": "CPN6 — 3ème trimestre"},
+    {"number": 7, "weekMin": 38, "weekMax": 40, "label": "CPN7 — 3ème trimestre"},
+    {"number": 8, "weekMin": 40, "weekMax": 42, "label": "CPN8 — Post-terme"},
+]
+
+
+def _next_cpn_overdue(lmp_date_str: str, done_numbers: list) -> Optional[dict]:
+    """Port of frontend `getNextCPN()` — returns next CPN slot with daysLate."""
+    if not lmp_date_str:
+        return None
+    try:
+        lmp = datetime.fromisoformat(lmp_date_str)
+    except Exception:
+        return None
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    delta_days = (now - lmp.replace(tzinfo=None)).days
+    weeks = delta_days // 7
+    done = set(done_numbers or [])
+
+    nxt = next(
+        (c for c in _CPN_OMS_WINDOWS if c["weekMin"] <= weeks <= c["weekMax"] and c["number"] not in done),
+        None,
+    )
+    if not nxt:
+        nxt = next((c for c in _CPN_OMS_WINDOWS if c["number"] not in done and c["weekMin"] >= weeks), None)
+    if not nxt:
+        nxt = next((c for c in _CPN_OMS_WINDOWS if c["number"] not in done), None)
+    if not nxt:
+        return None
+
+    days_late = (weeks - nxt["weekMax"]) * 7 if weeks > nxt["weekMax"] else 0
+    return {**nxt, "current_week": weeks, "days_late": days_late}
+
+
+async def _find_asc_for_patient(patient: dict) -> Optional[dict]:
+    """V1: any soignant in the same zone acts as ASC.
+    V2: dedicated role + geo matching per quartier."""
+    if not patient or not patient.get("zone_id"):
+        return None
+    return await db.users.find_one(
+        {"role": "soignant", "zone_id": patient["zone_id"]},
+        {"_id": 0, "id": 1, "name": 1, "phone": 1, "email": 1},
+    )
+
+
+async def _notify_asc(asc: dict, patient: dict, next_cpn: dict, days_late: int) -> None:
+    """V1: log only (no Twilio). Replace with WhatsApp send when integration is enabled."""
+    if not asc or not asc.get("phone"):
+        return
+    weeks_late = days_late // 7
+    message = (
+        f"[KHALABA] Recherche perdue de vue\n"
+        f"Patiente: {patient.get('full_name', 'N/A')}\n"
+        f"Tél: {patient.get('phone') or 'Non renseigné'}\n"
+        f"Adresse: {patient.get('address') or 'Non renseignée'}\n"
+        f"{next_cpn['label']} en retard de {weeks_late} semaine(s).\n"
+        f"Action: visite à domicile et ramener au CSC."
+    )
+    logger.info("LTFU notify (mock SMS) → %s : %s", asc.get("phone"), message.replace("\n", " | "))
+
+
+async def run_ltfu_scan() -> list:
+    """Scan en_cours pregnancies, flip to perdue_vue when CPN >14 days overdue.
+    Creates a PERDUE_DE_VUE alert + ASC assignment + audit log.
+    Idempotent — never creates duplicate open alerts.
+    """
+    flagged: list = []
+    pregnancies = await db.pregnancies.find(
+        {"status": {"$in": ["en_cours", "active"]}}, {"_id": 0}
+    ).to_list(5000)
+    for preg in pregnancies:
+        done = [
+            d["visit_number"] async for d in db.cpn_visits.find(
+                {"pregnancy_id": preg["id"]}, {"visit_number": 1, "_id": 0}
+            ) if d.get("visit_number") is not None
+        ]
+        nxt = _next_cpn_overdue(preg.get("lmp_date"), done)
+        if not nxt or nxt["days_late"] <= LTFU_THRESHOLD_DAYS:
+            continue
+
+        patient = await db.patients.find_one({"id": preg["patient_id"]}, {"_id": 0})
+        asc = await _find_asc_for_patient(patient)
+        weeks_late = nxt["days_late"] // 7
+
+        # Mark pregnancy as LTFU
+        await db.pregnancies.update_one(
+            {"id": preg["id"]},
+            {"$set": {"status": "perdue_vue", "updated_at": now_iso()}},
+        )
+
+        # Idempotency: skip if open LTFU alert already exists
+        existing = await db.alerts.find_one({
+            "pregnancy_id": preg["id"], "type": "PERDUE_DE_VUE", "is_read": False
+        })
+        alert_id = existing["id"] if existing else new_id()
+        if not existing:
+            await db.alerts.insert_one({
+                "id": alert_id,
+                "pregnancy_id": preg["id"],
+                "type": "PERDUE_DE_VUE",
+                "message": (
+                    f"{(patient or {}).get('full_name', 'Patiente')} — {nxt['label']} "
+                    f"en retard de {weeks_late} semaine(s). Recherche domicile."
+                ),
+                "severity": "WARNING",
+                "is_read": False,
+                "resolved_at": None,
+                "context": {
+                    "days_late": nxt["days_late"],
+                    "expected_cpn": nxt["number"],
+                    "label": nxt["label"],
+                },
+                "created_at": now_iso(),
+            })
+
+        # Notify + audit (only on first detection)
+        if not existing and asc:
+            await _notify_asc(asc, patient or {}, nxt, nxt["days_late"])
+            await db.audit_logs.insert_one({
+                "id": new_id(),
+                "user_id": asc["id"],
+                "user_email": asc.get("email", ""),
+                "action": "ASSIGNED_LTFU",
+                "entity": "Pregnancy",
+                "entity_id": preg["id"],
+                "new_data": {"alert_id": alert_id, "days_late": nxt["days_late"]},
+                "created_at": now_iso(),
+            })
+
+        flagged.append({
+            "pregnancy_id": preg["id"],
+            "patient_id": preg.get("patient_id"),
+            "patient_name": (patient or {}).get("full_name"),
+            "phone": (patient or {}).get("phone"),
+            "address": (patient or {}).get("address"),
+            "zone_id": (patient or {}).get("zone_id"),
+            "days_late": nxt["days_late"],
+            "weeks_late": weeks_late,
+            "expected_cpn": nxt["number"],
+            "expected_cpn_label": nxt["label"],
+            "asc": asc.get("name") if asc else None,
+            "asc_phone": asc.get("phone") if asc else None,
+            "alert_id": alert_id,
+            "already_flagged": bool(existing),
+        })
+    return flagged
+
+
+@api.post("/admin/check-ltfu")
+async def check_ltfu_endpoint(user=Depends(require_role("admin"))):
+    """Manual trigger for the LTFU scan (also runs daily at 07:00 via APScheduler)."""
+    flagged = await run_ltfu_scan()
+    return {
+        "scanned_at": now_iso(),
+        "threshold_days": LTFU_THRESHOLD_DAYS,
+        "flagged_count": len(flagged),
+        "newly_flagged": [f for f in flagged if not f["already_flagged"]],
+        "flagged": flagged,
+    }
+
+
+@api.get("/admin/ltfu")
+async def list_ltfu_cases(user=Depends(require_role("admin", "soignant"))):
+    """List currently open LTFU cases (PERDUE_DE_VUE alerts unresolved).
+    Zone-filtered for soignants."""
+    q: dict = {"type": "PERDUE_DE_VUE", "is_read": False}
+    if user["role"] == "soignant" and user.get("zone_id"):
+        patient_ids = [p["id"] async for p in db.patients.find({"zone_id": user["zone_id"]}, {"id": 1})]
+        preg_ids = [pr["id"] async for pr in db.pregnancies.find({"patient_id": {"$in": patient_ids}}, {"id": 1})]
+        q["pregnancy_id"] = {"$in": preg_ids}
+    alerts = await db.alerts.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
+    out = []
+    for a in alerts:
+        preg = await db.pregnancies.find_one({"id": a["pregnancy_id"]}, {"_id": 0, "patient_id": 1, "lmp_date": 1})
+        if not preg:
+            continue
+        patient = await db.patients.find_one({"id": preg["patient_id"]}, {"_id": 0, "full_name": 1, "phone": 1, "address": 1, "id": 1})
+        ctx = a.get("context") or {}
+        out.append({
+            "alert_id": a["id"],
+            "pregnancy_id": a["pregnancy_id"],
+            "patient": patient,
+            "message": a["message"],
+            "days_late": ctx.get("days_late"),
+            "weeks_late": (ctx.get("days_late") or 0) // 7,
+            "expected_cpn_label": ctx.get("label"),
+            "created_at": a["created_at"],
+        })
+    return out
 
 
 # ============================================================
@@ -475,6 +698,7 @@ async def list_alerts(
     severity: Optional[str] = None,
     is_read: Optional[bool] = None,
     pregnancy_id: Optional[str] = None,
+    type: Optional[str] = None,
     user=Depends(current_user),
 ):
     if user["role"] == "patient":
@@ -484,6 +708,8 @@ async def list_alerts(
         q["severity"] = severity
     if is_read is not None:
         q["is_read"] = is_read
+    if type:
+        q["type"] = type
     if pregnancy_id:
         q["pregnancy_id"] = pregnancy_id
     elif user["role"] == "soignant" and user.get("zone_id"):
@@ -1457,7 +1683,23 @@ async def startup():
 
     logger.info("KHALABA backend started — admin seeded.")
 
+    # Brique 7 — daily LTFU scan at 07:00 (Africa/Ndjamena ~ UTC+1, run UTC)
+    async def _ltfu_job():
+        try:
+            res = await run_ltfu_scan()
+            new_cases = [f for f in res if not f["already_flagged"]]
+            logger.info("LTFU daily scan: %d flagged (%d new)", len(res), len(new_cases))
+        except Exception as e:
+            logger.exception("LTFU scan failed: %s", e)
+
+    if not scheduler.running:
+        scheduler.add_job(_ltfu_job, "cron", hour=7, minute=0, id="ltfu_daily_scan", replace_existing=True)
+        scheduler.start()
+        logger.info("APScheduler started: ltfu_daily_scan @ 07:00 UTC")
+
 
 @app.on_event("shutdown")
 async def shutdown():
+    if scheduler.running:
+        scheduler.shutdown(wait=False)
     client.close()

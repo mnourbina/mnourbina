@@ -94,6 +94,16 @@ KHALABA is a digital maternal-infant health platform targeting Sub-Saharan Afric
 - ✅ Endpoint `GET /api/pregnancies` retourne désormais `done_cpns` (liste des numéros) et `cpn_count` pour alimenter la barre de progression
 - ✅ **62/62 tests pytest toujours OK**
 
+## Implemented (Iteration 7 — Feb 28, 2026) — Brique 7 : Perdues de vue (LTFU) automatique
+- ✅ **Scanner backend `run_ltfu_scan()`** : port fidèle du `checkLostToFollowUp` MSP. Pour chaque grossesse `en_cours`, calcule `getNextCPN(...)`, flippe en `perdue_vue` si `daysLate > 14`, crée une alerte type `PERDUE_DE_VUE` (severity WARNING) avec `context.days_late`, assigne un ASC (V1: tout soignant de la zone) + audit log `ASSIGNED_LTFU`. Notification ASC mockée (log only, prêt pour Twilio/WhatsApp).
+- ✅ **Idempotence stricte** : ne crée jamais d'alerte LTFU dupliquée — vérifie `existing` avant insert
+- ✅ **APScheduler** : job cron quotidien à 07:00 UTC démarré au boot FastAPI (`apscheduler==3.11.2` ajouté à requirements.txt)
+- ✅ Endpoints : `POST /api/admin/check-ltfu` (trigger manuel), `GET /api/admin/ltfu` (cas ouverts, zone-filtré pour soignants)
+- ✅ Filtre `type=` ajouté à `GET /api/alerts`
+- ✅ `POST /api/pregnancies/{id}/found` met aussi à jour les alertes `PERDUE_DE_VUE` (is_read + resolved_at) et journalise `MARKED_FOUND` dans audit_logs
+- ✅ Page admin `/app/admin/ltfu` (`AdminLTFUPage.jsx`) avec bouton "Lancer un scan", info dernier scan, grille de cartes LTFU avec bouton "Marquer comme retrouvée", nav link Perdues de vue
+- ✅ **70/70 tests pytest passent** (62 anciens + 8 nouveaux test_iteration7_ltfu.py — incluant idempotence + résolution d'alerte au mark-found)
+
 
 
 ## Backlog (P0 → P2)

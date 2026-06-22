@@ -31,6 +31,7 @@ import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminConfig from "@/pages/admin/AdminConfig";
 import AdminIndicators from "@/pages/admin/AdminIndicators";
 import AdminMonthlyReport from "@/pages/admin/AdminMonthlyReport";
+import AdminLTFUPage from "@/pages/admin/AdminLTFUPage";
 
 import "@/App.css";
 
@@ -103,6 +104,7 @@ function App() {
 
           {/* Admin */}
           <Route path="/app/admin" element={<ProtectedRoute roles={["admin"]}><AppLayout><AdminDashboard /></AppLayout></ProtectedRoute>} />
+          <Route path="/app/admin/ltfu" element={<ProtectedRoute roles={["admin"]}><AppLayout><AdminLTFUPage /></AppLayout></ProtectedRoute>} />
           <Route path="/app/admin/indicators" element={<ProtectedRoute roles={["admin"]}><AppLayout><AdminIndicators /></AppLayout></ProtectedRoute>} />
           <Route path="/app/admin/report" element={<ProtectedRoute roles={["admin"]}><AppLayout><AdminMonthlyReport /></AppLayout></ProtectedRoute>} />
           <Route path="/app/admin/config" element={<ProtectedRoute roles={["admin"]}><AppLayout><AdminConfig /></AppLayout></ProtectedRoute>} />

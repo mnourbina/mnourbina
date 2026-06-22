@@ -21,11 +21,13 @@ import {
   BarChart3,
   Activity,
   FileBarChart,
+  Search,
 } from "lucide-react";
 
 const navByRole = (t) => ({
   admin: [
     { to: "/app/admin", icon: BarChart3, label: t("admin.dashboard"), testid: "nav-admin-dash" },
+    { to: "/app/admin/ltfu", icon: Search, label: "Perdues de vue", testid: "nav-admin-ltfu" },
     { to: "/app/admin/report", icon: FileBarChart, label: "Rapport mensuel", testid: "nav-admin-report" },
     { to: "/app/admin/indicators", icon: Activity, label: t("nav.indicators"), testid: "nav-admin-indicators" },
     { to: "/app/admin/config", icon: Settings, label: t("nav.config"), testid: "nav-admin-config" },
