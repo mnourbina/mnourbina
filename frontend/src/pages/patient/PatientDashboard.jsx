@@ -54,14 +54,14 @@ export default function PatientDashboard() {
       </section>
 
       {pregnancy && (
-        <section className="bg-white rounded-2xl p-6 border border-[#3E2723]/5">
+        <section className="bg-white rounded-2xl p-6 border border-[#3E2723]/5" data-testid="patient-cpn-list">
           <h3 className="font-heading text-xl font-semibold text-[#3E2723] flex items-center gap-3">
             <Stethoscope size={20} className="text-[#C85A48]" /> {t("patient.cpn_history")}
           </h3>
           {cpnVisits.length === 0 ? (
             <p className="mt-4 text-[#795C55]">{t("patient.no_cpn")}</p>
           ) : (
-            <ol className="mt-6 relative border-l-2 border-[#C85A48]/20 ml-3 space-y-6" data-testid="patient-cpn-list">
+            <ol className="mt-6 relative border-l-2 border-[#C85A48]/20 ml-3 space-y-6" data-testid="patient-cpn-list-items">
               {cpnVisits.map(v => (
                 <li key={v.id} className="ml-6">
                   <div className="absolute -left-[11px] w-5 h-5 rounded-full bg-[#C85A48] border-4 border-white flex items-center justify-center text-[10px] font-bold text-white">
@@ -96,14 +96,14 @@ export default function PatientDashboard() {
       )}
 
       {pregnancy && (
-        <section className="bg-white rounded-2xl p-6 border border-[#3E2723]/5">
+        <section className="bg-white rounded-2xl p-6 border border-[#3E2723]/5" data-testid="patient-postnatal-list">
           <h3 className="font-heading text-xl font-semibold text-[#3E2723] flex items-center gap-3">
             <Baby size={20} className="text-[#C85A48]" /> {t("patient.postnatal_history")}
           </h3>
           {postnatal.length === 0 ? (
             <p className="mt-4 text-[#795C55]">{t("patient.no_postnatal")}</p>
           ) : (
-            <ul className="mt-4 divide-y divide-[#3E2723]/5" data-testid="patient-postnatal-list">
+            <ul className="mt-4 divide-y divide-[#3E2723]/5" data-testid="patient-postnatal-list-items">
               {postnatal.map(p => (
                 <li key={p.id} className="py-3 flex items-center justify-between">
                   <div>

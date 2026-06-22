@@ -40,6 +40,13 @@ KHALABA is a digital maternal-infant health platform targeting Sub-Saharan Afric
 - ✅ Warm earth-tone design (Terracotta / Ochre / Sand / Chocolate / Gold) — branded Logo with mother-child K silhouette
 - ✅ Mobile-responsive sidebar nav
 
+## Implemented (Iteration 2 — Feb 27, 2026)
+- ✅ Patient timeline endpoint `/api/patient/me/timeline` (CPN + postnatal + children + vaccinations nested)
+- ✅ Enriched Patient portal: vertical CPN timeline with numbered dots + alert badges, postnatal history, baby vaccination cards
+- ✅ Full Appointment management: create dialog (patient + date + time + type), shadcn Calendar with day-indicator dots, day-detail panel, status update (done/missed) via PATCH `/api/appointments/{id}`
+- ✅ Patient agenda grouped into Upcoming / Past with status badges
+- ✅ Multilingual FR / EN / AR with full RTL flip (sidebar position, html dir, text alignment), persistent in localStorage
+
 ## Backlog (P0 → P2)
 - P1: Appointments scheduler with calendar UI (model exists, UI is a list)
 - P1: Patient portal — display her own CPN visits, vaccination calendar of her baby

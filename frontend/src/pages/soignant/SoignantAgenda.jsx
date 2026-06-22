@@ -163,7 +163,7 @@ export default function SoignantAgenda() {
           />
         </div>
 
-        <section className="bg-white rounded-2xl p-5 border border-[#3E2723]/5">
+        <section className="bg-white rounded-2xl p-5 border border-[#3E2723]/5" data-testid="day-appts-list">
           <h2 className="font-heading text-lg font-semibold text-[#3E2723] flex items-center gap-2 mb-4">
             <CalendarIcon size={18} className="text-[#C85A48]" />
             {selectedDate?.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
@@ -171,7 +171,7 @@ export default function SoignantAgenda() {
           {dayAppts.length === 0 ? (
             <div className="py-10 text-center text-[#795C55] text-sm">{t("agenda.no_appts")}</div>
           ) : (
-            <ul className="space-y-3" data-testid="day-appts-list">
+            <ul className="space-y-3" data-testid="day-appts-items">
               {dayAppts.map(a => {
                 const d = new Date(a.scheduled_at);
                 return (
