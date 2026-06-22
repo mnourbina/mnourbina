@@ -6,13 +6,15 @@ load_dotenv(ROOT_DIR / ".env")
 
 import os
 import logging
-from datetime import datetime, timezone
 from typing import Optional, List
 
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
+import io
+import csv
+from datetime import datetime, timezone, timedelta
 
 from auth_utils import (
     hash_password,
@@ -523,6 +525,244 @@ async def analytics_overview(user=Depends(require_role("admin"))):
         "by_zone": by_zone,
         "top_complications": top_complications,
     }
+
+
+# ============================================================
+# DHIS2 / MSP Indicators
+# ============================================================
+DHIS2_INDICATOR_DEFS = [
+    {"code": "DE_CPN1_TOTAL", "label": "Nombre de CPN1", "formula": "cpn_visits where visit_number == 1", "category": "CPN"},
+    {"code": "DE_CPN4_TOTAL", "label": "Nombre de CPN4+", "formula": "grossesses avec >= 4 cpn_visits", "category": "CPN"},
+    {"code": "DE_ANEMIA_PREG", "label": "Anémie de la grossesse", "formula": "Hb < 11 g/dL", "category": "Biologie"},
+    {"code": "DE_VIH_TESTED", "label": "Femmes testées VIH", "formula": "hiv_status != INCONNU", "category": "VIH"},
+    {"code": "DE_VIH_POS", "label": "VIH positifs", "formula": "hiv_status = positif", "category": "VIH"},
+    {"code": "DE_SYPH_TESTED", "label": "Femmes testées Syphilis", "formula": "syphilis_status != INCONNU", "category": "Syphilis"},
+    {"code": "DE_SYPH_POS", "label": "Syphilis positifs", "formula": "syphilis_status = positif", "category": "Syphilis"},
+    {"code": "DE_MATERNAL_DEATH", "label": "Décès maternels", "formula": "death_type = maternelle", "category": "Mortalité"},
+    {"code": "DE_NEONATAL_DEATH", "label": "Décès néonatals", "formula": "death_type = neonatale", "category": "Mortalité"},
+    {"code": "DE_MPDSR_AUDITED", "label": "MPDSR audités (< 30j)", "formula": "audit_status = audite_en_comite et audit_date - death_date <= 30j", "category": "MPDSR"},
+]
+
+
+async def _patient_ids_in_zone(zone_id: Optional[str]):
+    if not zone_id:
+        return None
+    return [p["id"] async for p in db.patients.find({"zone_id": zone_id}, {"id": 1})]
+
+
+async def _pregnancy_ids_for_patients(patient_ids):
+    if patient_ids is None:
+        return None
+    return [pr["id"] async for pr in db.pregnancies.find({"patient_id": {"$in": patient_ids}}, {"id": 1})]
+
+
+async def _compute_dhis2_indicators(zone_id: Optional[str], date_from: Optional[str], date_to: Optional[str]) -> dict:
+    patient_ids = await _patient_ids_in_zone(zone_id)
+    pregnancy_ids = await _pregnancy_ids_for_patients(patient_ids)
+
+    cpn_q: dict = {}
+    if pregnancy_ids is not None:
+        cpn_q["pregnancy_id"] = {"$in": pregnancy_ids}
+    if date_from or date_to:
+        dq: dict = {}
+        if date_from:
+            dq["$gte"] = date_from
+        if date_to:
+            dq["$lte"] = date_to
+        cpn_q["visit_date"] = dq
+
+    cpn1 = await db.cpn_visits.count_documents({**cpn_q, "visit_number": 1})
+
+    # CPN4+ : grossesses avec >= 4 visites
+    pipeline_cpn4 = [
+        {"$match": cpn_q} if cpn_q else {"$match": {}},
+        {"$group": {"_id": "$pregnancy_id", "count": {"$sum": 1}}},
+        {"$match": {"count": {"$gte": 4}}},
+        {"$count": "n"},
+    ]
+    cpn4_doc = await db.cpn_visits.aggregate(pipeline_cpn4).to_list(1)
+    cpn4 = cpn4_doc[0]["n"] if cpn4_doc else 0
+
+    anemia = await db.cpn_visits.count_documents({**cpn_q, "hemoglobin": {"$lt": 11, "$gt": 0}})
+    vih_tested = await db.cpn_visits.count_documents({**cpn_q, "hiv_status": {"$in": ["negatif", "positif"]}})
+    vih_pos = await db.cpn_visits.count_documents({**cpn_q, "hiv_status": "positif"})
+    syph_tested = await db.cpn_visits.count_documents({**cpn_q, "syphilis_status": {"$in": ["negatif", "positif"]}})
+    syph_pos = await db.cpn_visits.count_documents({**cpn_q, "syphilis_status": "positif"})
+
+    mpdsr_q: dict = {}
+    if patient_ids is not None:
+        mpdsr_q["patient_id"] = {"$in": patient_ids}
+    if date_from or date_to:
+        ddq: dict = {}
+        if date_from:
+            ddq["$gte"] = date_from
+        if date_to:
+            ddq["$lte"] = date_to
+        mpdsr_q["death_date"] = ddq
+
+    maternal_death = await db.mpdsr_reports.count_documents({**mpdsr_q, "death_type": "maternelle"})
+    neonatal_death = await db.mpdsr_reports.count_documents({**mpdsr_q, "death_type": "neonatale"})
+
+    # MPDSR audités < 30 j
+    audited = 0
+    async for r in db.mpdsr_reports.find({**mpdsr_q, "audit_status": "audite_en_comite", "audit_date": {"$ne": None}}, {"_id": 0, "death_date": 1, "audit_date": 1}):
+        try:
+            dd = datetime.fromisoformat(r["death_date"])
+            ad = datetime.fromisoformat(r["audit_date"])
+            if (ad - dd).days <= 30:
+                audited += 1
+        except Exception:
+            continue
+
+    return {
+        "DE_CPN1_TOTAL": cpn1,
+        "DE_CPN4_TOTAL": cpn4,
+        "DE_ANEMIA_PREG": anemia,
+        "DE_VIH_TESTED": vih_tested,
+        "DE_VIH_POS": vih_pos,
+        "DE_SYPH_TESTED": syph_tested,
+        "DE_SYPH_POS": syph_pos,
+        "DE_MATERNAL_DEATH": maternal_death,
+        "DE_NEONATAL_DEATH": neonatal_death,
+        "DE_MPDSR_AUDITED": audited,
+    }
+
+
+@api.get("/analytics/dhis2-indicators")
+async def dhis2_indicators(
+    zone_id: Optional[str] = None,
+    period: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    user=Depends(require_role("admin")),
+):
+    # period (YYYYMM, DHIS2 standard) overrides date_from / date_to
+    if period and len(period) == 6:
+        year = int(period[:4])
+        month = int(period[4:])
+        first = datetime(year, month, 1).date().isoformat()
+        if month == 12:
+            last = datetime(year + 1, 1, 1).date()
+        else:
+            last = datetime(year, month + 1, 1).date()
+        last = (last - timedelta(days=1)).isoformat()
+        date_from, date_to = first, last
+    values = await _compute_dhis2_indicators(zone_id, date_from, date_to)
+    rows = []
+    for d in DHIS2_INDICATOR_DEFS:
+        rows.append({**d, "value": values.get(d["code"], 0)})
+    zones = await db.zones.find({}, {"_id": 0}).to_list(100)
+    zone_label = "Toutes zones"
+    if zone_id:
+        z = await db.zones.find_one({"id": zone_id}, {"_id": 0})
+        zone_label = z["name"] if z else zone_id
+    return {
+        "filters": {
+            "zone_id": zone_id,
+            "zone_label": zone_label,
+            "period": period,
+            "date_from": date_from,
+            "date_to": date_to,
+        },
+        "indicators": rows,
+        "zones": zones,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@api.get("/analytics/dhis2-export")
+async def dhis2_export_json(
+    period: str,
+    zone_id: Optional[str] = None,
+    user=Depends(require_role("admin")),
+):
+    """Returns DHIS2 DataValueSet JSON payload ready to be POSTed to DHIS2."""
+    if len(period) != 6:
+        raise HTTPException(400, "Format période invalide. Utiliser YYYYMM (ex: 202610)")
+    try:
+        year = int(period[:4])
+        month = int(period[4:])
+    except ValueError:
+        raise HTTPException(400, "Période non numérique")
+    first = datetime(year, month, 1).date().isoformat()
+    if month == 12:
+        last = datetime(year + 1, 1, 1).date()
+    else:
+        last = datetime(year, month + 1, 1).date()
+    last = (last - timedelta(days=1)).isoformat()
+
+    values = await _compute_dhis2_indicators(zone_id, first, last)
+    payload = {
+        "dataSet": "KHALABA_MNCH_MONTHLY",
+        "period": period,
+        "orgUnit": zone_id or "NATIONAL",
+        "attributeOptionCombo": "default",
+        "dataValues": [
+            {"dataElement": d["code"], "value": values.get(d["code"], 0)}
+            for d in DHIS2_INDICATOR_DEFS
+        ],
+        "completeDate": datetime.now(timezone.utc).date().isoformat(),
+    }
+    # Audit log
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "user_id": user["id"],
+        "user_email": user["email"],
+        "action": "EXPORT_DHIS2",
+        "entity": "Report",
+        "entity_id": period,
+        "zone_id": zone_id,
+        "values_summary": {dv["dataElement"]: dv["value"] for dv in payload["dataValues"]},
+        "created_at": now_iso(),
+    })
+    return payload
+
+
+@api.get("/audit-logs")
+async def list_audit_logs(limit: int = 50, user=Depends(require_role("admin"))):
+    return await db.audit_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(limit)
+
+
+@api.get("/analytics/dhis2-indicators/export.csv")
+async def dhis2_indicators_csv(
+    zone_id: Optional[str] = None,
+    period: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    user=Depends(require_role("admin")),
+):
+    if period and len(period) == 6:
+        year = int(period[:4])
+        month = int(period[4:])
+        first = datetime(year, month, 1).date().isoformat()
+        if month == 12:
+            last_dt = datetime(year + 1, 1, 1).date()
+        else:
+            last_dt = datetime(year, month + 1, 1).date()
+        last = (last_dt - timedelta(days=1)).isoformat()
+        date_from, date_to = first, last
+    values = await _compute_dhis2_indicators(zone_id, date_from, date_to)
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=";")
+    writer.writerow(["Code DHIS2", "Indicateur", "Catégorie", "Valeur", "Formule", "Zone", "Période_du", "Période_au", "Généré_le"])
+    zone_label = "Toutes zones"
+    if zone_id:
+        z = await db.zones.find_one({"id": zone_id}, {"_id": 0})
+        zone_label = z["name"] if z else zone_id
+    generated = datetime.now(timezone.utc).isoformat()
+    for d in DHIS2_INDICATOR_DEFS:
+        writer.writerow([
+            d["code"], d["label"], d["category"],
+            values.get(d["code"], 0), d["formula"],
+            zone_label, date_from or "", date_to or "", generated,
+        ])
+    csv_text = buf.getvalue()
+    filename = f"khalaba_dhis2_{(date_from or 'all')}_{(date_to or 'all')}.csv"
+    return PlainTextResponse(
+        csv_text,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ============================================================

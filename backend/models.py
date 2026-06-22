@@ -164,6 +164,8 @@ class MPDSRReportIn(BaseModel):
     medical_cause: str
     contributing_factors: List[str] = []
     audit_recommendations: Optional[str] = None
+    audit_status: Literal["non_audite", "audite_en_comite", "en_attente"] = "non_audite"
+    audit_date: Optional[str] = None
     notes: Optional[str] = None
 
 

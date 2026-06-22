@@ -23,6 +23,7 @@ const FR = {
   "nav.appointments": "Mes rendez-vous",
   "nav.baby": "Mon bébé",
   "nav.config": "Configuration",
+  "nav.indicators": "Indicateurs MSP",
   // Login
   "login.title": "Connexion",
   "login.subtitle": "Accédez à votre tableau de bord KHALABA.",
@@ -111,6 +112,7 @@ const EN = {
   "nav.appointments": "My appointments",
   "nav.baby": "My baby",
   "nav.config": "Configuration",
+  "nav.indicators": "MSP indicators",
   "login.title": "Sign in",
   "login.subtitle": "Access your KHALABA dashboard.",
   "login.email": "Email",
@@ -193,6 +195,7 @@ const AR = {
   "nav.appointments": "مواعيدي",
   "nav.baby": "طفلي",
   "nav.config": "الإعدادات",
+  "nav.indicators": "مؤشرات وزارة الصحة",
   "login.title": "تسجيل الدخول",
   "login.subtitle": "ادخلي إلى لوحة KHALABA الخاصة بك.",
   "login.email": "البريد الإلكتروني",

@@ -26,6 +26,7 @@ import SoignantAgenda from "@/pages/soignant/SoignantAgenda";
 
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminConfig from "@/pages/admin/AdminConfig";
+import AdminIndicators from "@/pages/admin/AdminIndicators";
 
 import "@/App.css";
 
@@ -95,6 +96,7 @@ function App() {
 
           {/* Admin */}
           <Route path="/app/admin" element={<ProtectedRoute roles={["admin"]}><AppLayout><AdminDashboard /></AppLayout></ProtectedRoute>} />
+          <Route path="/app/admin/indicators" element={<ProtectedRoute roles={["admin"]}><AppLayout><AdminIndicators /></AppLayout></ProtectedRoute>} />
           <Route path="/app/admin/config" element={<ProtectedRoute roles={["admin"]}><AppLayout><AdminConfig /></AppLayout></ProtectedRoute>} />
 
           <Route path="*" element={<Navigate to="/" replace />} />

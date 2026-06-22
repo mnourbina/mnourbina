@@ -28,6 +28,8 @@ export default function MPDSRPage() {
     medical_cause: "",
     contributing: "",
     audit_recommendations: "",
+    audit_status: "non_audite",
+    audit_date: "",
     notes: "",
   });
 
@@ -45,6 +47,8 @@ export default function MPDSRPage() {
         medical_cause: form.medical_cause,
         contributing_factors: form.contributing.split(",").map(s => s.trim()).filter(Boolean),
         audit_recommendations: form.audit_recommendations,
+        audit_status: form.audit_status,
+        audit_date: form.audit_date || null,
         notes: form.notes,
       });
       toast.success("Rapport MPDSR enregistré");
@@ -106,6 +110,21 @@ export default function MPDSRPage() {
                   <Label className="text-sm text-[#795C55] mb-1 block">Recommandations d'audit</Label>
                   <Textarea value={form.audit_recommendations} onChange={e => setForm({...form, audit_recommendations: e.target.value})} rows={3} className="rounded-xl" />
                 </div>
+                <div>
+                  <Label className="text-sm text-[#795C55] mb-1 block">Statut audit (MPDSR)</Label>
+                  <Select value={form.audit_status} onValueChange={(v) => setForm({...form, audit_status: v})}>
+                    <SelectTrigger className="h-11 rounded-xl" data-testid="audit-status-select"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="non_audite">Non audité</SelectItem>
+                      <SelectItem value="en_attente">En attente</SelectItem>
+                      <SelectItem value="audite_en_comite">Audité en comité</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm text-[#795C55] mb-1 block">Date audit</Label>
+                  <Input type="date" value={form.audit_date} onChange={e => setForm({...form, audit_date: e.target.value})} className="h-11 rounded-xl" data-testid="audit-date-input" />
+                </div>
                 <div className="sm:col-span-2">
                   <Label className="text-sm text-[#795C55] mb-1 block">Notes</Label>
                   <Textarea value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} rows={2} className="rounded-xl" />
@@ -129,10 +148,11 @@ export default function MPDSRPage() {
           <table className="w-full" data-testid="mpdsr-table">
             <thead className="bg-[#F7F3EB]">
               <tr className="text-left text-xs uppercase tracking-wider text-[#795C55]">
-                <th className="px-6 py-3">Date</th>
+                <th className="px-6 py-3">Date décès</th>
                 <th className="px-6 py-3">Type</th>
                 <th className="px-6 py-3">Lieu</th>
                 <th className="px-6 py-3">Cause</th>
+                <th className="px-6 py-3">Audit</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#3E2723]/5">
@@ -146,6 +166,16 @@ export default function MPDSRPage() {
                   </td>
                   <td className="px-6 py-4 text-[#795C55]">{r.place_of_death}</td>
                   <td className="px-6 py-4 text-[#3E2723]">{r.medical_cause}</td>
+                  <td className="px-6 py-4">
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                      r.audit_status === "audite_en_comite" ? "bg-[#4A7C59]/15 text-[#4A7C59]" :
+                      r.audit_status === "en_attente" ? "bg-[#F2C94C]/30 text-[#3E2723]" :
+                      "bg-[#3E2723]/10 text-[#795C55]"
+                    }`}>
+                      {r.audit_status || "non_audite"}
+                    </span>
+                    {r.audit_date && <div className="text-xs text-[#795C55] mt-1">{r.audit_date}</div>}
+                  </td>
                 </tr>
               ))}
             </tbody>

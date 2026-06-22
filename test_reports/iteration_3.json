@@ -1,0 +1,35 @@
+{
+  "summary": "Iteration 3 — DHIS2/MSP indicators. Created /app/backend/tests/test_iteration3_dhis2.py with 15 tests covering /api/analytics/dhis2-indicators (admin/403 for non-admin, period→date range, 10 indicator rows, zone filter), /api/analytics/dhis2-export (DataValueSet shape, orgUnit, period validation, audit log persistence), /api/audit-logs (admin only, EXPORT_DHIS2 entries), /api/analytics/dhis2-indicators/export.csv (semicolon-delimited, 9 columns), MPDSR audit_status/audit_date fields, and indicator computation with seeded TEST_ data (2 CPN visits, MPDSR audité). All 15/15 new tests pass; full regression suite 46/46 PASS (15 new + 31 from iterations 1+2). Frontend: /app/admin/indicators page renders 10 indicators with correct values for period 202602 (DE_CPN1_TOTAL=2, DE_ANEMIA_PREG=2, DE_VIH_TESTED=4, DE_VIH_POS=0, DE_SYPH_POS=2, DE_MATERNAL_DEATH=2, DE_MPDSR_AUDITED=2 — all matching the test_data spec). nav-admin-indicators sidebar link works; period-input, zone-filter, export-csv-btn, export-json-btn all present with correct data-testids; JSON export shows toast 'Payload DHIS2 généré · audit log enregistré' and renders json-preview (with valid DHIS2 DataValueSet JSON), copy-json-btn, download-json-btn. MPDSR dialog now exposes audit-status-select + audit-date-input. KHALABA terracotta palette preserved.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration3_dhis2.py",
+    "/app/backend/tests/test_iteration2_features.py",
+    "/app/backend/tests/test_khalaba_api.py",
+    "/app/test_reports/pytest/pytest_results.xml",
+    "/app/test_reports/pytest/iteration3_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is now ~906 lines (was 660). Refactor into routers/{auth,patients,pregnancies,appointments,analytics,dhis2}.py before iteration 4 to keep maintainability.",
+    "_compute_dhis2_indicators date filter uses ISO-string comparison on the visit_date / death_date fields — works only because the codebase consistently stores YYYY-MM-DD strings. If any future code stores datetime objects in those fields, the lexical $gte/$lte will silently mis-aggregate. Recommend explicit type coercion or a Pydantic StringDate type to enforce.",
+    "DHIS2 export endpoint returns the payload with `value` as integer; DHIS2 DataValueSet spec expects all values as strings. Consider casting to str() for full spec compliance before posting to a real DHIS2 instance.",
+    "/audit-logs has no pagination cursor — only `limit` query param. For real Ministry-scale audit trails, add `offset` or createdAt-cursor pagination + index on created_at.",
+    "/analytics/dhis2-indicators accepts period without checking len/digit format (only uses if len==6) — invalid periods silently fall through to all-time aggregates. Apply the same 400 validation as /dhis2-export for consistency.",
+    "CORS still allow_origins=['*'] + allow_credentials=True (carried over from iteration 2). Browsers reject cookies in that combo; tighten before production."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration3_dhis2.py (new — 15 tests)"
+  ],
+  "success_rate": {"backend": "100% (46/46 — 15 new + 31 regression)", "frontend": "100% (admin indicators page renders 10 rows with correct seeded values, sidebar nav works, JSON export + toast + preview + copy/download buttons all functional, MPDSR audit_status/audit_date inputs present in dialog)"},
+  "test_credentials": "admin@khalaba.health / khalaba2026, sagefemme@khalaba.health / khalaba2026, maman@khalaba.health / khalaba2026 (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "TEST_DHIS2 Mère patient + pregnancy + 2 CPN visits (2026-02-05 visit_number=1 hgb=8 hiv=negatif syph=positif; 2026-02-18 visit_number=4 hgb=12 hiv=negatif syph=negatif) + 1 MPDSR (death_type=maternelle, death_date=2026-02-10, audit_status=audite_en_comite, audit_date=2026-02-25). Also a second MPDSR via TestMpdsrAuditFields (death_type=neonatale, audit_status=en_attente, death_date=2026-03-05). Audit logs persisted for periods 202602 and 202603. Data remains in DB for future regression.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run: REACT_APP_BACKEND_URL=https://dev-build-127.preview.emergentagent.com pytest /app/backend/tests/ -v (46 tests, all PASS). Iteration 3 fully verified. The 10 DHIS2 indicator codes are defined in DHIS2_INDICATOR_DEFS at server.py:533; the DataValueSet dataset id is 'KHALABA_MNCH_MONTHLY'. The seeded MPDSR with audit_date - death_date = 15 days correctly counts toward DE_MPDSR_AUDITED. Verified UI values for period 202602: CPN1=2, ANEMIA=2, VIH_TESTED=4, VIH_POS=0, SYPH_POS=2, MATERNAL_DEATH=2, MPDSR_AUDITED=2 (some are 2 instead of 1 because the iteration-1 seeded MPDSR already lived in Feb 2026 and now has audit_status=audite_en_comite via the seeded data refresh).",
+  "rca of the issue": "No bugs found. All iteration-3 acceptance criteria met."
+}
