@@ -38,7 +38,7 @@ export default function PregnanciesList() {
   }, [pregnancies]);
 
   const filtered = useMemo(() => {
-    return pregnancies.filter(p => {
+    const list = pregnancies.filter(p => {
       if (filter === "all") return true;
       if (filter === "ltfu") return p.status === "perdue_vue";
       if (filter === "active") return ["en_cours", "active"].includes(p.status) && p.status !== "perdue_vue";
@@ -50,6 +50,21 @@ export default function PregnanciesList() {
         return nd && (Date.now() - nd.getTime()) / 86400000 > 7;
       }
       return true;
+    });
+    // MSP order: Perdues de vue first, then by LMP ascending (closest to delivery first)
+    const priority = (p) => {
+      if (p.status === "perdue_vue") return 0;
+      const lastN = p.last_cpn?.visit_number || 0;
+      const next = getNextCPNDate(p.lmp_date, lastN);
+      const nd = next?.date instanceof Date ? next.date : null;
+      if (nd && (Date.now() - nd.getTime()) / 86400000 > 14) return 1; // urgent
+      if (nd && (Date.now() - nd.getTime()) / 86400000 > 7)  return 2; // overdue
+      return 3;
+    };
+    return [...list].sort((a, b) => {
+      const pa = priority(a), pb = priority(b);
+      if (pa !== pb) return pa - pb;
+      return (a.lmp_date || "").localeCompare(b.lmp_date || "");
     });
   }, [pregnancies, filter]);
 
