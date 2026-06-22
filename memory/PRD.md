@@ -104,6 +104,13 @@ KHALABA is a digital maternal-infant health platform targeting Sub-Saharan Afric
 - ✅ Page admin `/app/admin/ltfu` (`AdminLTFUPage.jsx`) avec bouton "Lancer un scan", info dernier scan, grille de cartes LTFU avec bouton "Marquer comme retrouvée", nav link Perdues de vue
 - ✅ **70/70 tests pytest passent** (62 anciens + 8 nouveaux test_iteration7_ltfu.py — incluant idempotence + résolution d'alerte au mark-found)
 
+## Implemented (Iteration 8 — Feb 28, 2026) — Brique 8 : Export DHIS2 JSON aligné rapport district
+- ✅ **Nouveau endpoint `GET /api/reports/dhis2?month=X&year=Y[&zone_id=]`** (admin only) retournant un **DHIS2 DataValueSet JSON** spec-compliant : `dataSet=MATERNAL_HEALTH_MONTHLY`, `period=YYYYMM`, `orgUnit`, `attributeOptionCombo=DEFAULT`, `dataValues[]` avec `value` typé string
+- ✅ Mapping `DHIS2_REPORT_MAPPING` (10 dataElements) : `ANC1`, `ANC1_VISIT`, `ANC4_VISIT`, `DEL_FACILITY`, `ANEMIA_SCR`, `ANEMIA_CASE`, `HIV_TEST`, `HIV_POS`, `MAT_DEATH`, `NEO_DEATH` — alignés sur les indicateurs du rapport mensuel
+- ✅ Audit trail automatique : action `EXPORT_DHIS2_REPORT` enregistrée dans `audit_logs`
+- ✅ Bouton "Export DHIS2 JSON" ajouté à `AdminMonthlyReport.jsx` (à côté Imprimer/PDF et Export CSV)
+- ✅ **76/76 tests pytest passent** (70 anciens + 6 nouveaux test_iteration8_dhis2_report.py)
+
 
 
 ## Backlog (P0 → P2)

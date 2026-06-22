@@ -1502,6 +1502,65 @@ async def district_monthly_report(
     }
 
 
+# Brique 8 — DHIS2 DataValueSet export (simplified mapping aligned with district report cards)
+DHIS2_REPORT_MAPPING = {
+    "ANC_Registered":     ("totalPregnancies",  "ANC1"),
+    "ANC1_Visits":        ("cpn1",              "ANC1_VISIT"),
+    "ANC4_Visits":        ("cpn4",              "ANC4_VISIT"),
+    "Deliveries_Facility":("assistedBirths",    "DEL_FACILITY"),
+    "Anemia_Screened":    ("anemiaScreened",    "ANEMIA_SCR"),
+    "Anemia_Cases":       ("anemiaCases",       "ANEMIA_CASE"),
+    "HIV_Tested":         ("hivTested",         "HIV_TEST"),
+    "HIV_Positive":       ("hivPositive",       "HIV_POS"),
+    "Maternal_Deaths":    ("maternalDeaths",    "MAT_DEATH"),
+    "Neonatal_Deaths":    ("neonatalDeaths",    "NEO_DEATH"),
+}
+
+
+@api.get("/reports/dhis2")
+async def reports_dhis2_export(
+    month: int,
+    year: int,
+    zone_id: Optional[str] = None,
+    user=Depends(require_role("admin")),
+):
+    """DHIS2 DataValueSet JSON for the district monthly report (Brique 8).
+    Mirrors the same indicators displayed on the report grid.
+    """
+    report = await district_monthly_report(month=month, year=year, zone_id=zone_id, user=user)
+    ind = report["indicators"]
+    period = f"{year}{str(month).zfill(2)}"
+    data_values = []
+    for key, (ind_field, data_element) in DHIS2_REPORT_MAPPING.items():
+        data_values.append({
+            "dataElement": data_element,
+            "categoryOptionCombo": "DEFAULT",
+            "value": str(ind.get(ind_field, 0)),
+        })
+    payload = {
+        "dataSet": "MATERNAL_HEALTH_MONTHLY",
+        "completeDate": datetime.now(timezone.utc).date().isoformat(),
+        "period": period,
+        "orgUnit": zone_id or "DISTRICT_ORG_UNIT_ID",
+        "attributeOptionCombo": "DEFAULT",
+        "dataValues": data_values,
+    }
+    # Audit trail (same pattern as /analytics/dhis2-export)
+    await db.audit_logs.insert_one({
+        "id": new_id(),
+        "user_id": user["id"],
+        "user_email": user["email"],
+        "action": "EXPORT_DHIS2_REPORT",
+        "entity": "Report",
+        "entity_id": period,
+        "zone_id": zone_id,
+        "values_summary": {dv["dataElement"]: dv["value"] for dv in data_values},
+        "created_at": now_iso(),
+    })
+    return payload
+
+
+
 @api.get("/analytics/dhis2-indicators/export.csv")
 async def dhis2_indicators_csv(
     zone_id: Optional[str] = None,

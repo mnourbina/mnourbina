@@ -64,7 +64,15 @@ export default function AdminMonthlyReport() {
             const a = document.createElement("a");
             a.href = url; a.download = `district_${year}${String(month).padStart(2,'0')}.csv`; a.click();
           }} className="inline-flex items-center gap-2 bg-[#3E2723] hover:bg-[#2a1c1a] text-white px-4 h-11 rounded-xl font-medium" data-testid="export-dhis2-btn">
-            <Download size={16} /> Export DHIS2
+            <Download size={16} /> Export CSV
+          </button>
+          <button onClick={async () => {
+            const { data } = await api.get("/reports/dhis2", { params: { month, year } });
+            const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+            const a = document.createElement("a");
+            a.href = url; a.download = `DHIS2_District_${month}_${year}.json`; a.click();
+          }} className="inline-flex items-center gap-2 bg-[#4A7C59] hover:bg-[#3a6448] text-white px-4 h-11 rounded-xl font-medium" data-testid="export-dhis2-json-btn">
+            <Download size={16} /> Export DHIS2 JSON
           </button>
         </div>
       </header>
