@@ -64,7 +64,16 @@ KHALABA is a digital maternal-infant health platform targeting Sub-Saharan Afric
 - ✅ Statuts grossesse : `en_cours`, `perdue_vue`, `accouchee`, `fausse_couche`, `ivg`, `transferee` + legacy `active`
 - ✅ Normalisation HIV/Syphilis aux valeurs canoniques MSP : NEG / POS / INCONNU (rétrocompatible avec données legacy negatif/positif)
 - ✅ Filtre "Perdues de vue" + KPI strip + actions rapides (Appeler tel: / Marquer retrouvée / Nouvelle CPN / Ouvrir dossier)
+
+## Implemented (Iteration 5 — Feb 28, 2026) — MSP Schema alignment
+- ✅ **MPDSR enrichi (Brique 4)** : 3 retards OMS (recours, accès, prise en charge) + `preventable` + `preventive_actions` + nouveau type `foetal_in_utero` + statuts canoniques MSP (`en_attente_audit`, `audite_en_comite`, `cloture`)
+- ✅ **Alertes cliniques persistantes (Brique 3)** : collection `alerts` avec `severity` (CRITICAL/WARNING/INFO), `is_read`, `resolved_at`. Port fidèle de la fonction MSP `checkAlerts` : pré-éclampsie sévère (TA≥160/110), pré-éclampsie risque (≥140/90), anémie sévère (Hb<7), anémie modérée (Hb<11), bradycardie fœtale (BCF<110), tachycardie fœtale (BCF>160), protéinurie ++/+++
+- ✅ Endpoints : `GET /api/alerts` (zone-filtré), `GET /api/alerts/unread-count`, `PATCH /api/alerts/{id}` (mark read / resolve)
+- ✅ Page Alertes (`/app/soignant/alerts`) avec KPIs + filtres (Toutes/Non lues/Critiques/Résolues) + actions individuelles + tel: link direct
+- ✅ **Bilans cliniques étendus** : `creatinine`, `platelets`, `urine_albumin` (alias MSP de proteinuria), `iptp` (alias MSP de malaria_prophylaxis) — rétrocompatibles
+- ✅ Nav link "Alertes cliniques" avec icône Bell
 - ✅ **55/55 tests pytest passent**
+- ⚪ Hiérarchie Region/District/Facility (c) et AuditLog générique (e) reportés à une itération dédiée
 
 ## Backlog (P0 → P2)
 - P1: Appointments scheduler with calendar UI (model exists, UI is a list)

@@ -23,6 +23,7 @@ import CPNForm from "@/pages/soignant/CPNForm";
 import PostnatalForm from "@/pages/soignant/PostnatalForm";
 import VaccinationForm from "@/pages/soignant/VaccinationForm";
 import MPDSRPage from "@/pages/soignant/MPDSRPage";
+import AlertsPage from "@/pages/soignant/AlertsPage";
 import SoignantAgenda from "@/pages/soignant/SoignantAgenda";
 
 import AdminDashboard from "@/pages/admin/AdminDashboard";
@@ -94,6 +95,7 @@ function App() {
           <Route path="/app/soignant/patients/:id/postnatal" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><PostnatalForm /></AppLayout></ProtectedRoute>} />
           <Route path="/app/soignant/patients/:id/vaccination" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><VaccinationForm /></AppLayout></ProtectedRoute>} />
           <Route path="/app/soignant/mpdsr" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><MPDSRPage /></AppLayout></ProtectedRoute>} />
+          <Route path="/app/soignant/alerts" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><AlertsPage /></AppLayout></ProtectedRoute>} />
           <Route path="/app/soignant/agenda" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><SoignantAgenda /></AppLayout></ProtectedRoute>} />
 
           {/* Admin */}

@@ -93,9 +93,12 @@ class CPNVisitIn(BaseModel):
     bp_diastolic: Optional[int] = None
     uterine_height_cm: Optional[float] = None
     fetal_heart_rate: Optional[int] = None
-    # Biology
+    # Biology (extended MSP)
     hemoglobin: Optional[float] = None
     proteinuria: Optional[str] = None  # negative/+/++/+++
+    urine_albumin: Optional[str] = None  # alias MSP for proteinuria
+    creatinine: Optional[float] = None  # umol/L or mg/dL
+    platelets: Optional[int] = None  # /mm3
     hiv_status: Optional[str] = None
     syphilis_status: Optional[str] = None
     hepb_status: Optional[str] = None
@@ -104,6 +107,7 @@ class CPNVisitIn(BaseModel):
     deworming: Optional[bool] = False
     tetanus_dose: Optional[int] = None  # 0-5
     malaria_prophylaxis: Optional[bool] = False
+    iptp: Optional[bool] = None  # MSP canonical alias for malaria_prophylaxis
     # Complications & notes
     complications: List[str] = []
     notes: Optional[str] = None
@@ -158,14 +162,24 @@ class VaccinationIn(BaseModel):
 class MPDSRReportIn(BaseModel):
     patient_id: Optional[str] = None
     pregnancy_id: Optional[str] = None
-    death_type: Literal["maternelle", "neonatale"]
+    death_type: Literal["maternelle", "neonatale", "foetal_in_utero"]
     death_date: str
     place_of_death: str
     medical_cause: str
     contributing_factors: List[str] = []
     audit_recommendations: Optional[str] = None
-    audit_status: Literal["non_audite", "audite_en_comite", "en_attente"] = "non_audite"
+    # MSP canonical audit_status
+    audit_status: Literal[
+        "non_audite", "en_attente", "en_attente_audit",
+        "audite_en_comite", "cloture"
+    ] = "en_attente_audit"
     audit_date: Optional[str] = None
+    # 3 retards OMS (WHO three-delays model)
+    delay1_recours: Optional[bool] = False         # délai de recours aux soins
+    delay2_acces: Optional[bool] = False           # délai d'accès à la structure
+    delay3_prise_charge: Optional[bool] = False    # délai de prise en charge
+    preventable: Optional[bool] = False
+    preventive_actions: Optional[str] = None
     notes: Optional[str] = None
 
 

@@ -20,6 +20,7 @@ const FR = {
   "nav.pregnancies": "Grossesses actives",
   "nav.agenda": "Agenda",
   "nav.mpdsr": "Surveillance (MPDSR)",
+  "nav.alerts": "Alertes cliniques",
   "nav.pregnancy": "Ma grossesse",
   "nav.appointments": "Mes rendez-vous",
   "nav.baby": "Mon bébé",

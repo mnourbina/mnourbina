@@ -355,30 +355,150 @@ async def get_pregnancy(pregnancy_id: str, user=Depends(current_user)):
 # ============================================================
 # CPN VISITS
 # ============================================================
+async def _check_and_persist_alerts(cpn: dict) -> list:
+    """MSP-grade alert checker, faithful port of the reference checkAlerts."""
+    alerts_to_create = []
+    sys_bp = cpn.get("bp_systolic")
+    dia_bp = cpn.get("bp_diastolic")
+    hb = cpn.get("hemoglobin")
+    fhr = cpn.get("fetal_heart_rate")
+    prot = cpn.get("urine_albumin") or cpn.get("proteinuria")
+    pid = cpn["pregnancy_id"]
+
+    if sys_bp and dia_bp:
+        if sys_bp >= 160 or dia_bp >= 110:
+            alerts_to_create.append({"pregnancy_id": pid, "type": "PRE_ECLAMPSIE_SEVERE",
+                "message": f"URGENCE: TA {sys_bp}/{dia_bp} mmHg. Référer immédiatement à l'hôpital", "severity": "CRITICAL"})
+        elif sys_bp >= 140 or dia_bp >= 90:
+            alerts_to_create.append({"pregnancy_id": pid, "type": "PRE_ECLAMPSIE_RISQUE",
+                "message": f"TA élevée: {sys_bp}/{dia_bp} mmHg. Contrôler TA dans 4h + bandelette urinaire", "severity": "WARNING"})
+    if hb is not None and hb > 0:
+        if hb < 7:
+            alerts_to_create.append({"pregnancy_id": pid, "type": "ANEMIE_SEVERE",
+                "message": f"Anémie sévère: Hb {hb} g/dl. Transfusion + Fer IV urgent", "severity": "CRITICAL"})
+        elif hb < 11:
+            alerts_to_create.append({"pregnancy_id": pid, "type": "ANEMIE_MODEREE",
+                "message": f"Anémie: Hb {hb} g/dl. Fer + Acide folique + conseil nutritionnel", "severity": "WARNING"})
+    if fhr:
+        if fhr < 110:
+            alerts_to_create.append({"pregnancy_id": pid, "type": "BRADYCARDIE_FOETALE",
+                "message": f"BCF bas: {fhr} bpm. Position latérale gauche + O2 + référer urgent", "severity": "CRITICAL"})
+        elif fhr > 160:
+            alerts_to_create.append({"pregnancy_id": pid, "type": "TACHYCARDIE_FOETALE",
+                "message": f"BCF élevé: {fhr} bpm. Rechercher fièvre maternelle + infection", "severity": "WARNING"})
+    if prot in ("++", "+++"):
+        alerts_to_create.append({"pregnancy_id": pid, "type": "PROTEINURIE",
+            "message": f"Protéinurie {prot}. Suspect pré-éclampsie. TA + créatinine urgentes", "severity": "WARNING"})
+
+    persisted = []
+    for a in alerts_to_create:
+        a["id"] = new_id()
+        a["consultation_id"] = cpn.get("id")
+        a["is_read"] = False
+        a["resolved_at"] = None
+        a["created_at"] = now_iso()
+        await db.alerts.insert_one(a)
+        a.pop("_id", None)
+        persisted.append(a)
+    return persisted
+
+
 @api.post("/cpn-visits")
 async def create_cpn(payload: CPNVisitIn, user=Depends(require_role("soignant", "admin"))):
     doc = {"id": new_id(), **payload.model_dump(), "created_at": now_iso(), "created_by": user["id"]}
-    # Alert flags
-    alerts = []
+    # Sync iptp <-> malaria_prophylaxis and urine_albumin <-> proteinuria
+    if doc.get("iptp") is True:
+        doc["malaria_prophylaxis"] = True
+    if doc.get("malaria_prophylaxis") is True and doc.get("iptp") is None:
+        doc["iptp"] = True
+    if doc.get("urine_albumin") and not doc.get("proteinuria"):
+        doc["proteinuria"] = doc["urine_albumin"]
+    # Legacy short alerts
+    legacy = []
     if payload.bp_systolic and payload.bp_systolic >= 140:
-        alerts.append("Hypertension")
+        legacy.append("Hypertension")
     if payload.bp_diastolic and payload.bp_diastolic >= 90:
-        alerts.append("Hypertension diastolique")
+        legacy.append("Hypertension diastolique")
     if payload.hemoglobin is not None and payload.hemoglobin < 7:
-        alerts.append("Anémie sévère")
+        legacy.append("Anémie sévère")
     elif payload.hemoglobin is not None and payload.hemoglobin < 11:
-        alerts.append("Anémie")
-    if payload.proteinuria and payload.proteinuria in ("++", "+++"):
-        alerts.append("Protéinurie élevée")
-    doc["alerts"] = alerts
+        legacy.append("Anémie")
+    if (doc.get("proteinuria") or doc.get("urine_albumin")) in ("++", "+++"):
+        legacy.append("Protéinurie élevée")
+    doc["alerts"] = legacy
     await db.cpn_visits.insert_one(doc)
     doc.pop('_id', None)
+    # MSP-grade persistent alerts
+    persisted = await _check_and_persist_alerts(doc)
+    doc["msp_alerts"] = persisted
     return doc
 
 
 @api.get("/cpn-visits")
 async def list_cpn(pregnancy_id: str, user=Depends(current_user)):
     return await db.cpn_visits.find({"pregnancy_id": pregnancy_id}, {"_id": 0}).sort("visit_number", 1).to_list(50)
+
+
+# ============================================================
+# ALERTS (persistent, MSP-grade)
+# ============================================================
+@api.get("/alerts")
+async def list_alerts(
+    severity: Optional[str] = None,
+    is_read: Optional[bool] = None,
+    user=Depends(current_user),
+):
+    if user["role"] == "patient":
+        raise HTTPException(403, "Réservé aux soignants")
+    q: dict = {}
+    if severity:
+        q["severity"] = severity
+    if is_read is not None:
+        q["is_read"] = is_read
+    # Zone scope for soignant
+    if user["role"] == "soignant" and user.get("zone_id"):
+        patient_ids = [p["id"] async for p in db.patients.find({"zone_id": user["zone_id"]}, {"id": 1})]
+        preg_ids = [pr["id"] async for pr in db.pregnancies.find({"patient_id": {"$in": patient_ids}}, {"id": 1})]
+        q["pregnancy_id"] = {"$in": preg_ids}
+    rows = await db.alerts.find(q, {"_id": 0}).sort("created_at", -1).to_list(500)
+    # Hydrate with patient name & last cpn
+    for r in rows:
+        preg = await db.pregnancies.find_one({"id": r["pregnancy_id"]}, {"_id": 0, "patient_id": 1, "lmp_date": 1})
+        if preg:
+            patient = await db.patients.find_one({"id": preg["patient_id"]}, {"_id": 0, "full_name": 1, "phone": 1, "id": 1})
+            r["patient"] = patient
+            r["lmp_date"] = preg.get("lmp_date")
+    return rows
+
+
+@api.get("/alerts/unread-count")
+async def unread_alerts_count(user=Depends(current_user)):
+    if user["role"] == "patient":
+        return {"total": 0, "critical": 0}
+    q: dict = {"is_read": False}
+    if user["role"] == "soignant" and user.get("zone_id"):
+        patient_ids = [p["id"] async for p in db.patients.find({"zone_id": user["zone_id"]}, {"id": 1})]
+        preg_ids = [pr["id"] async for pr in db.pregnancies.find({"patient_id": {"$in": patient_ids}}, {"id": 1})]
+        q["pregnancy_id"] = {"$in": preg_ids}
+    total = await db.alerts.count_documents(q)
+    critical = await db.alerts.count_documents({**q, "severity": "CRITICAL"})
+    return {"total": total, "critical": critical}
+
+
+@api.patch("/alerts/{alert_id}")
+async def update_alert(alert_id: str, payload: dict, user=Depends(require_role("soignant", "admin"))):
+    update = {}
+    if "is_read" in payload:
+        update["is_read"] = bool(payload["is_read"])
+    if payload.get("resolve"):
+        update["resolved_at"] = now_iso()
+        update["is_read"] = True
+    if not update:
+        raise HTTPException(400, "Aucun champ à modifier")
+    res = await db.alerts.update_one({"id": alert_id}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Alerte introuvable")
+    return await db.alerts.find_one({"id": alert_id}, {"_id": 0})
 
 
 # ============================================================
@@ -862,6 +982,8 @@ async def startup():
     await db.zones.create_index("id", unique=True)
     await db.structures.create_index("id", unique=True)
     await db.otp_codes.create_index("user_id", unique=True)
+    await db.alerts.create_index("pregnancy_id")
+    await db.alerts.create_index([("created_at", -1)])
 
     # seed zones
     if await db.zones.count_documents({}) == 0:

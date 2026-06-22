@@ -28,8 +28,13 @@ export default function MPDSRPage() {
     medical_cause: "",
     contributing: "",
     audit_recommendations: "",
-    audit_status: "non_audite",
+    audit_status: "en_attente_audit",
     audit_date: "",
+    delay1_recours: false,
+    delay2_acces: false,
+    delay3_prise_charge: false,
+    preventable: false,
+    preventive_actions: "",
     notes: "",
   });
 
@@ -49,6 +54,11 @@ export default function MPDSRPage() {
         audit_recommendations: form.audit_recommendations,
         audit_status: form.audit_status,
         audit_date: form.audit_date || null,
+        delay1_recours: form.delay1_recours,
+        delay2_acces: form.delay2_acces,
+        delay3_prise_charge: form.delay3_prise_charge,
+        preventable: form.preventable,
+        preventive_actions: form.preventive_actions,
         notes: form.notes,
       });
       toast.success("Rapport MPDSR enregistré");
@@ -87,6 +97,7 @@ export default function MPDSRPage() {
                     <SelectContent>
                       <SelectItem value="maternelle">Mort maternelle</SelectItem>
                       <SelectItem value="neonatale">Mort néonatale</SelectItem>
+                      <SelectItem value="foetal_in_utero">Mort fœtale in utero</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -115,15 +126,58 @@ export default function MPDSRPage() {
                   <Select value={form.audit_status} onValueChange={(v) => setForm({...form, audit_status: v})}>
                     <SelectTrigger className="h-11 rounded-xl" data-testid="audit-status-select"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="non_audite">Non audité</SelectItem>
-                      <SelectItem value="en_attente">En attente</SelectItem>
+                      <SelectItem value="en_attente_audit">En attente d'audit</SelectItem>
                       <SelectItem value="audite_en_comite">Audité en comité</SelectItem>
+                      <SelectItem value="cloture">Clôturé</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label className="text-sm text-[#795C55] mb-1 block">Date audit</Label>
                   <Input type="date" value={form.audit_date} onChange={e => setForm({...form, audit_date: e.target.value})} className="h-11 rounded-xl" data-testid="audit-date-input" />
+                </div>
+                <div className="sm:col-span-2">
+                  <Label className="text-sm text-[#795C55] mb-2 block font-medium">3 retards OMS (cocher ceux applicables)</Label>
+                  <div className="grid sm:grid-cols-3 gap-2" data-testid="three-delays">
+                    {[
+                      { k: "delay1_recours", label: "1er retard — Recours aux soins" },
+                      { k: "delay2_acces",   label: "2ème retard — Accès à la structure" },
+                      { k: "delay3_prise_charge", label: "3ème retard — Prise en charge" },
+                    ].map(d => (
+                      <label key={d.k} className={`flex items-start gap-2 p-3 rounded-xl border cursor-pointer text-sm ${form[d.k] ? "border-[#B83A2E] bg-[#B83A2E]/5" : "border-[#3E2723]/10 bg-[#F7F3EB]/40"}`}>
+                        <input
+                          type="checkbox"
+                          checked={form[d.k]}
+                          onChange={e => setForm({...form, [d.k]: e.target.checked})}
+                          className="mt-0.5"
+                          data-testid={`delay-${d.k}`}
+                        />
+                        <span className="font-medium text-[#3E2723]">{d.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer ${form.preventable ? "border-[#F2C94C] bg-[#F2C94C]/15" : "border-[#3E2723]/10 bg-[#F7F3EB]/40"}`}>
+                    <input
+                      type="checkbox"
+                      checked={form.preventable}
+                      onChange={e => setForm({...form, preventable: e.target.checked})}
+                      data-testid="preventable-check"
+                    />
+                    <span className="font-medium text-[#3E2723]">Ce décès était évitable</span>
+                  </label>
+                </div>
+                <div className="sm:col-span-2">
+                  <Label className="text-sm text-[#795C55] mb-1 block">Actions préventives recommandées</Label>
+                  <Textarea
+                    value={form.preventive_actions}
+                    onChange={e => setForm({...form, preventive_actions: e.target.value})}
+                    rows={3}
+                    placeholder="Ex : Renforcer la formation des sages-femmes sur l'hémorragie du post-partum, sécuriser l'approvisionnement en ocytocine…"
+                    className="rounded-xl"
+                    data-testid="preventive-actions"
+                  />
                 </div>
                 <div className="sm:col-span-2">
                   <Label className="text-sm text-[#795C55] mb-1 block">Notes</Label>
