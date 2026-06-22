@@ -113,7 +113,7 @@ def seeded_data(soignant_session, admin_session):
     pending = s_soig.get(f"{API}/auth/pending-audit", timeout=15).json().get("pending")
     if pending:
         s_soig.post(f"{API}/mpdsr/{pending['id']}/complete-audit", json={
-            "delay1_recours": False, "delay2_acces": False, "delay3_prise_charge": False,
+            "delay1_recours": True, "delay2_acces": False, "delay3_prise_charge": False,
             "preventable": False, "preventive_actions": "test cleanup",
         }, timeout=15)
     # MPDSR maternal death 2026-02-10 audited 2026-02-25 (15j)
@@ -132,7 +132,7 @@ def seeded_data(soignant_session, admin_session):
     death_id = (m.json().get("death") or m.json()).get("id")
     if death_id:
         s_soig.post(f"{API}/mpdsr/{death_id}/complete-audit", json={
-            "delay1_recours": False, "delay2_acces": False, "delay3_prise_charge": False,
+            "delay1_recours": True, "delay2_acces": False, "delay3_prise_charge": False,
             "preventable": False, "preventive_actions": "audited via fixture",
             "audit_date": "2026-02-25",
         }, timeout=15)
@@ -296,7 +296,7 @@ class TestMpdsrAuditFields:
         pending = s.get(f"{API}/auth/pending-audit", timeout=15).json().get("pending")
         if pending:
             s.post(f"{API}/mpdsr/{pending['id']}/complete-audit", json={
-                "delay1_recours": False, "delay2_acces": False, "delay3_prise_charge": False,
+                "delay1_recours": True, "delay2_acces": False, "delay3_prise_charge": False,
                 "preventable": False, "preventive_actions": "test cleanup",
             }, timeout=15)
         plist = s.get(f"{API}/patients", timeout=15)

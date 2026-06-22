@@ -10,10 +10,34 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { AlertTriangle, Loader2, Lock, ShieldCheck } from "lucide-react";
 
 const DELAYS = [
-  { k: "delay1_recours", label: "1er retard — Recours aux soins (décision de la famille)" },
-  { k: "delay2_acces",   label: "2ème retard — Accès à la structure de soins" },
-  { k: "delay3_prise_charge", label: "3ème retard — Prise en charge médicale dans la structure" },
+  { k: "delay1_recours", label: "1er retard — Décision de recourir aux soins" },
+  { k: "delay2_acces",   label: "2ème retard — Accès aux soins (transport, distance)" },
+  { k: "delay3_prise_charge", label: "3ème retard — Prise en charge adéquate dans la structure" },
 ];
+
+const FACTORS = {
+  delay1_recours: [
+    "Manque reconnaissance de la gravité",
+    "Décision familiale tardive",
+    "Coût du transport",
+    "Croyances / traditions",
+    "Ignorance des signes de danger",
+  ],
+  delay2_acces: [
+    "Distance CSC > 5 km",
+    "Mauvais état de la route",
+    "Pas de transport / ambulance",
+    "Coût du carburant",
+    "Pénurie de carburant",
+  ],
+  delay3_prise_charge: [
+    "Personnel absent ou non qualifié",
+    "Rupture de médicaments",
+    "Pas d'oxygène / salle d'op",
+    "Référence hôpital tardive",
+    "Négligence prise en charge",
+  ],
+};
 
 export default function MPDSRAuditPage() {
   const { id } = useParams();
@@ -24,6 +48,9 @@ export default function MPDSRAuditPage() {
     delay1_recours: false,
     delay2_acces: false,
     delay3_prise_charge: false,
+    delay1_factors: [],
+    delay2_factors: [],
+    delay3_factors: [],
     preventable: false,
     preventive_actions: "",
     audit_recommendations: "",
@@ -37,8 +64,23 @@ export default function MPDSRAuditPage() {
     });
   }, [id]);
 
+  const toggleFactor = (delayKey, factor) => {
+    setForm(s => {
+      const fk = `${delayKey}_factors`;
+      const current = s[fk] || [];
+      return {
+        ...s,
+        [fk]: current.includes(factor) ? current.filter(x => x !== factor) : [...current, factor],
+      };
+    });
+  };
+
   const submit = async (e) => {
     e.preventDefault();
+    if (!form.delay1_recours && !form.delay2_acces && !form.delay3_prise_charge) {
+      toast.error("Cochez au moins un retard selon le modèle OMS des 3 retards.");
+      return;
+    }
     setLoading(true);
     try {
       await api.post(`/mpdsr/${id}/complete-audit`, form);
@@ -86,10 +128,29 @@ export default function MPDSRAuditPage() {
           </h3>
           <div className="space-y-2">
             {DELAYS.map(d => (
-              <label key={d.k} className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer ${form[d.k] ? "border-[#B83A2E] bg-[#B83A2E]/5" : "border-[#3E2723]/10 bg-[#F7F3EB]/40"}`}>
-                <Checkbox checked={form[d.k]} onCheckedChange={(v) => setForm({...form, [d.k]: !!v})} data-testid={`audit-${d.k}`} />
-                <span className="text-sm text-[#3E2723] font-medium">{d.label}</span>
-              </label>
+              <div key={d.k} className={`rounded-xl border ${form[d.k] ? "border-[#B83A2E] bg-[#B83A2E]/5" : "border-[#3E2723]/10 bg-[#F7F3EB]/40"}`}>
+                <label className="flex items-start gap-3 p-4 cursor-pointer">
+                  <Checkbox checked={form[d.k]} onCheckedChange={(v) => setForm({...form, [d.k]: !!v})} data-testid={`audit-${d.k}`} />
+                  <span className="text-sm text-[#3E2723] font-medium">{d.label}</span>
+                </label>
+                {form[d.k] && (
+                  <div className="px-4 pb-4 pl-12 space-y-2" data-testid={`audit-${d.k}-factors`}>
+                    <div className="text-xs uppercase tracking-wider text-[#795C55] mb-2">Facteurs OMS contributifs (cocher tous ceux qui s'appliquent)</div>
+                    {FACTORS[d.k].map(f => (
+                      <label key={f} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={(form[`${d.k}_factors`] || []).includes(f)}
+                          onChange={() => toggleFactor(d.k, f)}
+                          data-testid={`factor-${d.k}-${f.slice(0,12).replace(/\s+/g,'-')}`}
+                          className="rounded"
+                        />
+                        <span className="text-sm text-[#3E2723]">{f}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </div>

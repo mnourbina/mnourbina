@@ -17,6 +17,17 @@ import {
 } from "@/components/ui/dialog";
 import { AlertTriangle, Plus, Loader2 } from "lucide-react";
 
+const CAUSES_OMS = [
+  "Hémorragie du post-partum",
+  "Éclampsie / Pré-éclampsie",
+  "Septicémie",
+  "Avortement compliqué",
+  "Asphyxie néonatale",
+  "Prématurité",
+  "Infection néonatale",
+  "Autre",
+];
+
 export default function MPDSRPage() {
   const [reports, setReports] = useState([]);
   const [open, setOpen] = useState(false);
@@ -223,6 +234,23 @@ export default function MPDSRPage() {
                   <td className="px-6 py-4">
                     <span className={`text-xs px-2 py-1 rounded-full font-medium ${
                       r.audit_status === "audite_en_comite" ? "bg-[#4A7C59]/15 text-[#4A7C59]" :
+                      r.audit_status === "en_attente" ? "bg-[#F2C94C]/30 text-[#3E2723]" :
+                      "bg-[#3E2723]/10 text-[#795C55]"
+                    }`}>
+                      {r.audit_status || "non_audite"}
+                    </span>
+                    {r.audit_date && <div className="text-xs text-[#795C55] mt-1">{r.audit_date}</div>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+    </div>
+  );
+}
+/15 text-[#4A7C59]" :
                       r.audit_status === "en_attente" ? "bg-[#F2C94C]/30 text-[#3E2723]" :
                       "bg-[#3E2723]/10 text-[#795C55]"
                     }`}>

@@ -670,14 +670,20 @@ async def complete_mpdsr_audit(death_id: str, payload: dict, user=Depends(requir
     missing = [f for f in required if f not in payload]
     if missing:
         raise HTTPException(400, f"Champs requis manquants : {', '.join(missing)}")
+    if not (payload["delay1_recours"] or payload["delay2_acces"] or payload["delay3_prise_charge"]):
+        raise HTTPException(400, "Cochez au moins un retard selon le modèle OMS des 3 retards.")
     update = {
         "delay1_recours": bool(payload["delay1_recours"]),
         "delay2_acces": bool(payload["delay2_acces"]),
         "delay3_prise_charge": bool(payload["delay3_prise_charge"]),
+        "delay1_factors": list(payload.get("delay1_factors") or []),
+        "delay2_factors": list(payload.get("delay2_factors") or []),
+        "delay3_factors": list(payload.get("delay3_factors") or []),
         "preventable": bool(payload["preventable"]),
         "preventive_actions": str(payload["preventive_actions"]),
         "audit_status": "audite_en_comite",
         "audit_date": payload.get("audit_date") or datetime.now(timezone.utc).date().isoformat(),
+        "audit_recommendations": payload.get("audit_recommendations") or "",
         "audited_by": user["id"],
         "audited_at": now_iso(),
         "updated_at": now_iso(),

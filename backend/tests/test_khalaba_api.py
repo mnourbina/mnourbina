@@ -257,7 +257,7 @@ def test_mpdsr_create_and_list(soignant_session):
     pending = s.get(f"{API}/auth/pending-audit", timeout=15).json().get("pending")
     if pending:
         s.post(f"{API}/mpdsr/{pending['id']}/complete-audit", json={
-            "delay1_recours": False, "delay2_acces": False, "delay3_prise_charge": False,
+            "delay1_recours": True, "delay2_acces": False, "delay3_prise_charge": False,
             "preventable": False, "preventive_actions": "test cleanup",
         }, timeout=15)
     payload = {
