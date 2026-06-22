@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { useI18n } from "@/i18n/I18nContext";
 import Logo from "./Logo";
+import LanguageToggle from "./LanguageToggle";
 import {
   LayoutDashboard,
   Users,
   Calendar,
-  Stethoscope,
   Syringe,
   AlertTriangle,
   Settings,
@@ -18,41 +19,43 @@ import {
   BarChart3,
 } from "lucide-react";
 
-const linksByRole = {
+const navByRole = (t) => ({
   admin: [
-    { to: "/app/admin", icon: BarChart3, label: "Tableau de bord", testid: "nav-admin-dash" },
-    { to: "/app/admin/config", icon: Settings, label: "Configuration", testid: "nav-admin-config" },
+    { to: "/app/admin", icon: BarChart3, label: t("admin.dashboard"), testid: "nav-admin-dash" },
+    { to: "/app/admin/config", icon: Settings, label: t("nav.config"), testid: "nav-admin-config" },
   ],
   soignant: [
-    { to: "/app/soignant", icon: LayoutDashboard, label: "Tableau de bord", testid: "nav-soignant-dash" },
-    { to: "/app/soignant/patients", icon: Users, label: "Mes patientes", testid: "nav-soignant-patients" },
-    { to: "/app/soignant/agenda", icon: Calendar, label: "Agenda", testid: "nav-soignant-agenda" },
-    { to: "/app/soignant/mpdsr", icon: AlertTriangle, label: "Surveillance (MPDSR)", testid: "nav-soignant-mpdsr" },
+    { to: "/app/soignant", icon: LayoutDashboard, label: t("nav.dashboard"), testid: "nav-soignant-dash" },
+    { to: "/app/soignant/patients", icon: Users, label: t("nav.patients"), testid: "nav-soignant-patients" },
+    { to: "/app/soignant/agenda", icon: Calendar, label: t("nav.agenda"), testid: "nav-soignant-agenda" },
+    { to: "/app/soignant/mpdsr", icon: AlertTriangle, label: t("nav.mpdsr"), testid: "nav-soignant-mpdsr" },
   ],
   patient: [
-    { to: "/app/patient", icon: Heart, label: "Ma grossesse", testid: "nav-patient-home" },
-    { to: "/app/patient/agenda", icon: Calendar, label: "Mes rendez-vous", testid: "nav-patient-agenda" },
-    { to: "/app/patient/bebe", icon: Baby, label: "Mon bébé", testid: "nav-patient-baby" },
+    { to: "/app/patient", icon: Heart, label: t("nav.pregnancy"), testid: "nav-patient-home" },
+    { to: "/app/patient/agenda", icon: Calendar, label: t("nav.appointments"), testid: "nav-patient-agenda" },
+    { to: "/app/patient/bebe", icon: Baby, label: t("nav.baby"), testid: "nav-patient-baby" },
   ],
-};
+});
 
 export default function AppLayout({ children }) {
   const { user, logout } = useAuth();
+  const { t, isRtl } = useI18n();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const links = linksByRole[user?.role] || [];
+  const links = navByRole(t)[user?.role] || [];
 
   const handleLogout = async () => {
     await logout();
     navigate("/");
   };
 
+  const sideStart = isRtl ? "right-0" : "left-0";
+
   return (
-    <div className="min-h-screen bg-[#F7F3EB] flex">
-      {/* Sidebar */}
+    <div className="min-h-screen bg-[#F7F3EB] flex" dir={isRtl ? "rtl" : "ltr"}>
       <aside
-        className={`fixed lg:sticky top-0 left-0 z-40 h-screen w-72 bg-white border-r border-[#3E2723]/10 transform transition-transform duration-300 ${
-          open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        className={`fixed lg:sticky top-0 ${sideStart} z-40 h-screen w-72 bg-white ${isRtl ? "border-l" : "border-r"} border-[#3E2723]/10 transform transition-transform duration-300 ${
+          open ? "translate-x-0" : (isRtl ? "translate-x-full lg:translate-x-0" : "-translate-x-full lg:translate-x-0")
         }`}
         data-testid="app-sidebar"
       >
@@ -90,9 +93,10 @@ export default function AppLayout({ children }) {
           ))}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[#3E2723]/10 bg-white">
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[#3E2723]/10 bg-white space-y-3">
+          <LanguageToggle />
           <div className="flex items-center gap-3 px-2 py-2">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#C85A48] to-[#D99A5A] flex items-center justify-center text-white font-semibold">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#C85A48] to-[#D99A5A] flex items-center justify-center text-white font-semibold shrink-0">
               {(user?.name || "?").slice(0, 1).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
@@ -106,16 +110,15 @@ export default function AppLayout({ children }) {
           </div>
           <button
             onClick={handleLogout}
-            className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[#3E2723]/15 text-[#795C55] hover:bg-[#F7F3EB] hover:text-[#C85A48] transition font-medium"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-[#3E2723]/15 text-[#795C55] hover:bg-[#F7F3EB] hover:text-[#C85A48] transition font-medium"
             data-testid="logout-btn"
           >
             <LogOut size={16} />
-            Déconnexion
+            {t("logout")}
           </button>
         </div>
       </aside>
 
-      {/* Mobile overlay */}
       {open && (
         <div
           className="fixed inset-0 bg-[#3E2723]/40 z-30 lg:hidden"
@@ -123,9 +126,7 @@ export default function AppLayout({ children }) {
         />
       )}
 
-      {/* Main */}
       <div className="flex-1 min-w-0">
-        {/* Mobile header */}
         <header className="lg:hidden bg-white border-b border-[#3E2723]/10 sticky top-0 z-20 px-4 py-3 flex items-center justify-between">
           <button onClick={() => setOpen(true)} className="text-[#3E2723]" data-testid="sidebar-open-btn">
             <Menu size={24} />

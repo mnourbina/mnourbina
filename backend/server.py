@@ -439,6 +439,36 @@ async def list_appointments(user=Depends(current_user)):
     return await db.appointments.find({}, {"_id": 0}).sort("scheduled_at", 1).to_list(500)
 
 
+@api.patch("/appointments/{appt_id}")
+async def update_appointment(appt_id: str, payload: dict, user=Depends(require_role("soignant", "admin"))):
+    allowed = {"status", "notes", "scheduled_at"}
+    update = {k: v for k, v in payload.items() if k in allowed}
+    if not update:
+        raise HTTPException(400, "Aucun champ valide à modifier")
+    res = await db.appointments.update_one({"id": appt_id}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Rendez-vous introuvable")
+    doc = await db.appointments.find_one({"id": appt_id}, {"_id": 0})
+    return doc
+
+
+@api.get("/patient/me/timeline")
+async def patient_timeline(user=Depends(current_user)):
+    if user["role"] != "patient":
+        raise HTTPException(403, "Réservé aux patientes")
+    patient = await db.patients.find_one({"user_id": user["id"]}, {"_id": 0})
+    if not patient:
+        return {"patient": None, "pregnancies": [], "children": []}
+    pregnancies = await db.pregnancies.find({"patient_id": patient["id"]}, {"_id": 0}).sort("created_at", -1).to_list(20)
+    for preg in pregnancies:
+        preg["cpn_visits"] = await db.cpn_visits.find({"pregnancy_id": preg["id"]}, {"_id": 0}).sort("visit_number", 1).to_list(50)
+        preg["postnatal_visits"] = await db.postnatal_visits.find({"pregnancy_id": preg["id"]}, {"_id": 0}).sort("visit_date", 1).to_list(50)
+    children = await db.children.find({"patient_id": patient["id"]}, {"_id": 0}).to_list(20)
+    for c in children:
+        c["vaccinations"] = await db.vaccinations.find({"child_id": c["id"]}, {"_id": 0}).sort("date_given", 1).to_list(200)
+    return {"patient": patient, "pregnancies": pregnancies, "children": children}
+
+
 # ============================================================
 # ANALYTICS (Admin)
 # ============================================================

@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { I18nProvider } from "@/i18n/I18nContext";
 import ProtectedRoute from "@/components/app/ProtectedRoute";
 import AppLayout from "@/components/app/AppLayout";
 
@@ -38,8 +39,9 @@ function RoleHome() {
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <I18nProvider>
+      <AuthProvider>
+        <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
@@ -98,8 +100,9 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Toaster richColors position="top-right" />
-      </BrowserRouter>
-    </AuthProvider>
+        </BrowserRouter>
+      </AuthProvider>
+    </I18nProvider>
   );
 }
 

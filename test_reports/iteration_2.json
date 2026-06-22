@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 2 testing of KHALABA — patient timeline, appointments CRUD + status updates, and FR/EN/AR i18n with RTL. Created 10 new pytest cases in /app/backend/tests/test_iteration2_features.py (all PASS). All 31 backend tests pass (10 new + 21 regression). Frontend: patient dashboard renders the 3 new sections, language toggle works for FR/EN/AR with RTL applied to <html dir='rtl'> and sidebar flipped to the right, persists in localStorage. Soignant agenda renders shadcn Calendar + opens 'Nouveau rendez-vous' dialog with all expected data-testids; submitting creates a new appointment (agenda counter 3 -> 4) and a success toast appears. Patient agenda groups Passés appointments with translated status badges. Patient Baby page renders empty state. Admin dashboard regression OK (3 Recharts SVGs).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PatientDashboard sections", "issue": "data-testid='patient-cpn-list' and data-testid='patient-postnatal-list' are NOT present on the rendered DOM. The two sections render correctly visually ('Historique de mes consultations prénatales' and 'Mes visites postnatales'), but the parent <section>/<div> for each is missing its data-testid. Only data-testid='patient-dashboard' is present.", "selector": "[data-testid='patient-cpn-list'], [data-testid='patient-postnatal-list']", "priority": "MEDIUM"},
+      {"component": "SoignantAgenda day panel", "issue": "data-testid='day-appts-list' is NOT present on the right-side day-detail container. Could not verify mark-done-{id} / mark-missed-{id} buttons because no appointments fell on the currently-selected day (today=2026-06-22) and the calendar previous-month chevron lacks a stable selector (no aria-label, no data-testid).", "selector": "[data-testid='day-appts-list']", "priority": "MEDIUM"},
+      {"component": "SoignantAgenda calendar nav", "issue": "Previous/next month chevrons in the shadcn Calendar caption have no aria-label or data-testid — automated tests cannot reliably navigate months. Add aria-label='Previous month'/'Next month' or data-testid='calendar-prev'/'calendar-next'.", "selector": ".rdp button[name='previous-month']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iteration2_features.py",
+    "/app/backend/tests/test_khalaba_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Add data-testid='patient-cpn-list' to the 'Historique de mes consultations prénatales' container and data-testid='patient-postnatal-list' to the 'Mes visites postnatales' container in /app/frontend/src/pages/patient/PatientDashboard.jsx.",
+    "Add data-testid='day-appts-list' to the day-detail right panel in /app/frontend/src/pages/soignant/SoignantAgenda.jsx, and ensure mark-done-{id}/mark-missed-{id} buttons are rendered when appointments exist for the selected day (verified via backend that they do exist on 2026-02-15 / 2026-03-20 / 2026-04-10).",
+    "Add aria-label or data-testid to the shadcn Calendar previous/next month buttons so e2e tests can navigate months."
+  ],
+  "critical_code_review_comments": [
+    "PATCH /api/appointments/{appt_id} accepts a free-form dict instead of a Pydantic model — replace with a Pydantic AppointmentPatchIn (Literal[scheduled, done, missed] for status) to get 422 instead of 400 for invalid statuses.",
+    "GET /api/patient/me/timeline ignores zone scoping — fine for a patient (they only see their own data), but the endpoint should still attach an explicit projection to avoid leaking any future PII fields.",
+    "Appointment 'type' Literal enum is 'CPN' (upper) but the patient agenda displays it lowercase ('vaccination'); ensure the soignant SELECT options and the patient list display are aligned with the i18n keys.",
+    "server.py is still ~660 lines (was 627). Strongly recommend splitting into routers/{auth,patients,pregnancies,appointments,analytics}.py before iteration 3.",
+    "CORS still has allow_origins=['*'] AND allow_credentials=True — browsers reject Set-Cookie cross-origin in that combo. For production, set an explicit allow_origins list."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iteration2_features.py (new — 10 tests for /api/patient/me/timeline and /api/appointments POST/GET/PATCH including 404, 403, status updates, cross-role visibility)"
+  ],
+  "success_rate": {"backend": "100% (31/31 — 10 new + 21 regression)", "frontend": "~90% (critical flows all work; missing data-testids on 3 components prevented automated verification of mark-done/mark-missed buttons and CPN/postnatal section selectors, but the underlying flows render and the PATCH endpoint is verified via API tests)"},
+  "test_credentials": "admin@khalaba.health / khalaba2026, sagefemme@khalaba.health / khalaba2026, maman@khalaba.health / khalaba2026 (read from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Appointment tests created several TEST_ appointments on 2026-02-15 (CPN), 2026-03-20 (vaccination, for maman) and 2026-04-10 (via UI). These remain in the DB and are visible in patient agenda 'Passés' and soignant agenda counter.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All 31 backend tests pass. Re-run with: pytest /app/backend/tests/ -v. The three missing data-testids (patient-cpn-list, patient-postnatal-list, day-appts-list) should be added by the main agent in PatientDashboard.jsx and SoignantAgenda.jsx; once added, mark-done-{id}/mark-missed-{id} status toggling can be e2e-verified by navigating the calendar to a past month (Feb/Mar/Apr 2026). i18n verified: FR (default), EN (Dashboard/Pregnancy labels), AR with html dir='rtl' and sidebar flipped right; persists in localStorage key 'lang'. Patient timeline endpoint returns the seeded pregnancy for maman (lmp 2025-06-01) but the UI dashboard sections render their empty-state because the iteration-1 CPN visits were created against the TEST_Mère Test pregnancy, not maman's seeded one — this is expected, not a bug.",
+  "rca of the issue": "No backend issues found in iteration 2. Frontend gaps are limited to 3 missing data-testid attributes and one missing aria-label on the calendar nav chevron — these are low-risk testability misses, not functional defects."
+}
