@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import api, { formatApiErrorDetail } from "@/lib/api";
+import { useI18n } from "@/i18n/I18nContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,6 +10,7 @@ import {
 import { Settings, MapPin, Building2, Plus, Loader2, Globe2 } from "lucide-react";
 
 export default function AdminConfig() {
+  const { t } = useI18n();
   const [regions, setRegions] = useState([]);
   const [zones, setZones] = useState([]);
   const [structures, setStructures] = useState([]);
@@ -31,7 +33,7 @@ export default function AdminConfig() {
       const payload = { ...newRegion };
       if (!payload.dhis2_org_unit_uid) delete payload.dhis2_org_unit_uid;
       await api.post("/regions", payload);
-      toast.success("Région créée");
+      toast.success(t("config.created_region"));
       setNewRegion({ name: "", country: "Tchad", dhis2_org_unit_uid: "" });
       reload();
     } catch (e) {
@@ -46,7 +48,7 @@ export default function AdminConfig() {
       const payload = { ...newZone };
       if (!payload.region_id) delete payload.region_id;
       await api.post("/zones", payload);
-      toast.success("District créé");
+      toast.success(t("config.created_district"));
       setNewZone({ name: "", region: "", region_id: "", country: "Tchad" });
       reload();
     } catch (e) {
@@ -59,7 +61,7 @@ export default function AdminConfig() {
     setLoading(true);
     try {
       await api.post("/structures", newStruct);
-      toast.success("Structure créée");
+      toast.success(t("config.created_structure"));
       setNewStruct({ name: "", zone_id: "", type: "centre_sante" });
       reload();
     } catch (e) {
@@ -71,77 +73,75 @@ export default function AdminConfig() {
     <div className="space-y-8" data-testid="admin-config">
       <header>
         <h1 className="font-heading text-3xl font-semibold text-[#3E2723] flex items-center gap-3">
-          <Settings className="text-[#C85A48]" size={28} /> Configuration
+          <Settings className="text-[#C85A48]" size={28} /> {t("config.title")}
         </h1>
-        <p className="mt-2 text-[#795C55]">
-          Hiérarchie sanitaire : <strong>Région → District → Structure</strong>. Configurez les UID DHIS2 pour activer l&apos;export vers le SIS national.
-        </p>
+        <p className="mt-2 text-[#795C55]">{t("config.subtitle")}</p>
       </header>
 
       <section className="bg-white rounded-2xl p-6 border border-[#3E2723]/5" data-testid="section-regions">
         <h3 className="font-heading text-lg font-semibold text-[#3E2723] flex items-center gap-2 mb-4">
-          <Globe2 size={18} className="text-[#C85A48]" /> Régions sanitaires
+          <Globe2 size={18} className="text-[#C85A48]" /> {t("config.regions")}
         </h3>
         <form onSubmit={createRegion} className="grid sm:grid-cols-4 gap-2 mb-5" data-testid="new-region-form">
-          <Input required value={newRegion.name} onChange={e => setNewRegion({...newRegion, name: e.target.value})} placeholder="Nom de la région" className="h-11 rounded-xl sm:col-span-2" data-testid="new-region-name"/>
-          <Input value={newRegion.dhis2_org_unit_uid} onChange={e => setNewRegion({...newRegion, dhis2_org_unit_uid: e.target.value})} placeholder="UID DHIS2" className="h-11 rounded-xl" data-testid="new-region-uid"/>
+          <Input required value={newRegion.name} onChange={e => setNewRegion({...newRegion, name: e.target.value})} placeholder={t("config.region_name")} className="h-11 rounded-xl sm:col-span-2" data-testid="new-region-name"/>
+          <Input value={newRegion.dhis2_org_unit_uid} onChange={e => setNewRegion({...newRegion, dhis2_org_unit_uid: e.target.value})} placeholder={t("config.dhis2_uid_short")} className="h-11 rounded-xl" data-testid="new-region-uid"/>
           <Button type="submit" disabled={loading} className="bg-[#C85A48] hover:bg-[#B34D3D] text-white rounded-xl h-11" data-testid="new-region-submit">
-            {loading ? <Loader2 className="animate-spin" size={16}/> : <><Plus size={16}/> Créer</>}
+            {loading ? <Loader2 className="animate-spin" size={16}/> : <><Plus size={16}/> {t("config.create")}</>}
           </Button>
         </form>
         <ul className="divide-y divide-[#3E2723]/5">
-          {regions.map(r => <RegionRow key={r.id} r={r} onUpdate={reload}/>)}
+          {regions.map(r => <RegionRow key={r.id} r={r} onUpdate={reload} t={t}/>)}
         </ul>
-        {regions.length === 0 && <div className="text-sm text-[#795C55]">Aucune région.</div>}
+        {regions.length === 0 && <div className="text-sm text-[#795C55]">{t("config.no_regions")}</div>}
       </section>
 
       <div className="grid lg:grid-cols-2 gap-6">
         <section className="bg-white rounded-2xl p-6 border border-[#3E2723]/5">
           <h3 className="font-heading text-lg font-semibold text-[#3E2723] flex items-center gap-2 mb-4">
-            <MapPin size={18} className="text-[#C85A48]" /> Districts sanitaires
-            <span className="text-xs text-[#795C55] font-normal">(zones)</span>
+            <MapPin size={18} className="text-[#C85A48]" /> {t("config.districts")}
+            <span className="text-xs text-[#795C55] font-normal">{t("config.districts_aka")}</span>
           </h3>
           <form onSubmit={createZone} className="space-y-3 mb-5" data-testid="new-zone-form">
-            <Input required value={newZone.name} onChange={e => setNewZone({...newZone, name: e.target.value})} placeholder="Nom du district" className="h-11 rounded-xl" />
+            <Input required value={newZone.name} onChange={e => setNewZone({...newZone, name: e.target.value})} placeholder={t("config.district_name")} className="h-11 rounded-xl" />
             <Select required value={newZone.region_id || ""} onValueChange={(v) => {
               const r = regions.find(x => x.id === v);
               setNewZone({...newZone, region_id: v, region: r?.name || newZone.region});
             }}>
-              <SelectTrigger className="h-11 rounded-xl" data-testid="new-zone-region"><SelectValue placeholder="Région rattachée"/></SelectTrigger>
+              <SelectTrigger className="h-11 rounded-xl" data-testid="new-zone-region"><SelectValue placeholder={t("config.region_parent")}/></SelectTrigger>
               <SelectContent>
                 {regions.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
               </SelectContent>
             </Select>
             <Button type="submit" disabled={loading} className="bg-[#C85A48] hover:bg-[#B34D3D] text-white rounded-xl w-full" data-testid="new-zone-submit">
-              {loading ? <Loader2 className="animate-spin" /> : <><Plus size={16}/> Créer le district</>}
+              {loading ? <Loader2 className="animate-spin" /> : <><Plus size={16}/> {t("config.create_district")}</>}
             </Button>
           </form>
           <ul className="divide-y divide-[#3E2723]/5">
-            {zones.map(z => <ZoneRow key={z.id} z={z} regions={regions} onUpdate={reload} />)}
+            {zones.map(z => <ZoneRow key={z.id} z={z} regions={regions} onUpdate={reload} t={t} />)}
           </ul>
         </section>
 
         <section className="bg-white rounded-2xl p-6 border border-[#3E2723]/5">
           <h3 className="font-heading text-lg font-semibold text-[#3E2723] flex items-center gap-2 mb-4">
-            <Building2 size={18} className="text-[#C85A48]" /> Structures de soins
+            <Building2 size={18} className="text-[#C85A48]" /> {t("config.structures")}
           </h3>
           <form onSubmit={createStruct} className="space-y-3 mb-5" data-testid="new-struct-form">
-            <Input required value={newStruct.name} onChange={e => setNewStruct({...newStruct, name: e.target.value})} placeholder="Nom de la structure" className="h-11 rounded-xl" />
+            <Input required value={newStruct.name} onChange={e => setNewStruct({...newStruct, name: e.target.value})} placeholder={t("config.structure_name")} className="h-11 rounded-xl" />
             <Select required value={newStruct.zone_id} onValueChange={(v) => setNewStruct({...newStruct, zone_id: v})}>
-              <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="District rattaché" /></SelectTrigger>
+              <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder={t("config.district_parent")} /></SelectTrigger>
               <SelectContent>{zones.map(z => <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>)}</SelectContent>
             </Select>
             <Select value={newStruct.type} onValueChange={(v) => setNewStruct({...newStruct, type: v})}>
               <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="hopital">Hôpital</SelectItem>
-                <SelectItem value="centre_sante">Centre de santé</SelectItem>
-                <SelectItem value="clinique">Clinique</SelectItem>
-                <SelectItem value="case_sante">Case de santé</SelectItem>
+                <SelectItem value="hopital">{t("config.type_hopital")}</SelectItem>
+                <SelectItem value="centre_sante">{t("config.type_centre_sante")}</SelectItem>
+                <SelectItem value="clinique">{t("config.type_clinique")}</SelectItem>
+                <SelectItem value="case_sante">{t("config.type_case_sante")}</SelectItem>
               </SelectContent>
             </Select>
             <Button type="submit" disabled={loading} className="bg-[#C85A48] hover:bg-[#B34D3D] text-white rounded-xl w-full" data-testid="new-struct-submit">
-              {loading ? <Loader2 className="animate-spin" /> : <><Plus size={16}/> Créer la structure</>}
+              {loading ? <Loader2 className="animate-spin" /> : <><Plus size={16}/> {t("config.create_structure")}</>}
             </Button>
           </form>
           <ul className="divide-y divide-[#3E2723]/5 max-h-96 overflow-y-auto">
@@ -149,8 +149,8 @@ export default function AdminConfig() {
               <li key={s.id} className="py-3" data-testid={`struct-row-${s.id}`}>
                 <div className="font-medium text-[#3E2723]">{s.name}</div>
                 <div className="text-xs text-[#795C55] capitalize">
-                  {s.type.replace("_", " ")}
-                  {s.dhis2_org_unit_uid && <> · UID DHIS2 <code className="bg-[#F7F3EB] px-1 rounded">{s.dhis2_org_unit_uid}</code></>}
+                  {t(`config.type_${s.type}`)}
+                  {s.dhis2_org_unit_uid && <> · {t("config.dhis2_uid_short")} <code className="bg-[#F7F3EB] px-1 rounded">{s.dhis2_org_unit_uid}</code></>}
                 </div>
               </li>
             ))}
@@ -161,7 +161,7 @@ export default function AdminConfig() {
   );
 }
 
-function RegionRow({ r, onUpdate }) {
+function RegionRow({ r, onUpdate, t }) {
   const [name, setName] = useState(r.name);
   const [uid, setUid] = useState(r.dhis2_org_unit_uid || "");
   const [saving, setSaving] = useState(false);
@@ -171,7 +171,7 @@ function RegionRow({ r, onUpdate }) {
     setSaving(true);
     try {
       await api.patch(`/regions/${r.id}`, { name, dhis2_org_unit_uid: uid || null });
-      toast.success("Région mise à jour");
+      toast.success(t("config.updated_region"));
       onUpdate?.();
     } catch (e) {
       toast.error(formatApiErrorDetail(e.response?.data?.detail));
@@ -180,15 +180,15 @@ function RegionRow({ r, onUpdate }) {
   return (
     <li className="py-3 grid sm:grid-cols-4 gap-2 items-center" data-testid={`region-row-${r.id}`}>
       <Input value={name} onChange={(e) => setName(e.target.value)} className="h-9 rounded-lg text-sm sm:col-span-2" data-testid={`region-name-${r.id}`}/>
-      <Input value={uid} onChange={(e) => setUid(e.target.value)} placeholder="UID DHIS2 (org unit)" className="h-9 rounded-lg text-xs" data-testid={`region-uid-${r.id}`}/>
+      <Input value={uid} onChange={(e) => setUid(e.target.value)} placeholder={t("config.dhis2_uid")} className="h-9 rounded-lg text-xs" data-testid={`region-uid-${r.id}`}/>
       <Button type="button" onClick={save} disabled={saving || !dirty} className="h-9 rounded-lg text-xs bg-[#3E2723] hover:bg-[#2a1c1a] disabled:opacity-40" data-testid={`region-save-${r.id}`}>
-        {saving ? <Loader2 size={12} className="animate-spin"/> : "Enregistrer"}
+        {saving ? <Loader2 size={12} className="animate-spin"/> : t("save")}
       </Button>
     </li>
   );
 }
 
-function ZoneRow({ z, regions, onUpdate }) {
+function ZoneRow({ z, regions, onUpdate, t }) {
   const [uid, setUid] = useState(z.dhis2_org_unit_uid || "");
   const [saving, setSaving] = useState(false);
   const region = regions.find(r => r.id === z.region_id);
@@ -197,7 +197,7 @@ function ZoneRow({ z, regions, onUpdate }) {
     setSaving(true);
     try {
       await api.patch(`/zones/${z.id}`, { dhis2_org_unit_uid: uid || null });
-      toast.success("UID DHIS2 mis à jour");
+      toast.success(t("config.updated_uid"));
       onUpdate?.();
     } catch (e) {
       toast.error(formatApiErrorDetail(e.response?.data?.detail));
@@ -212,9 +212,9 @@ function ZoneRow({ z, regions, onUpdate }) {
         </div>
       </div>
       <div className="flex gap-2 items-center">
-        <Input value={uid} onChange={(e) => setUid(e.target.value)} placeholder="UID DHIS2 (org unit)" className="h-9 rounded-lg text-xs flex-1" data-testid={`zone-dhis2-uid-${z.id}`}/>
+        <Input value={uid} onChange={(e) => setUid(e.target.value)} placeholder={t("config.dhis2_uid")} className="h-9 rounded-lg text-xs flex-1" data-testid={`zone-dhis2-uid-${z.id}`}/>
         <Button type="button" onClick={save} disabled={saving} className="h-9 px-3 rounded-lg text-xs bg-[#3E2723] hover:bg-[#2a1c1a]" data-testid={`zone-dhis2-save-${z.id}`}>
-          {saving ? <Loader2 size={12} className="animate-spin"/> : "Enregistrer"}
+          {saving ? <Loader2 size={12} className="animate-spin"/> : t("save")}
         </Button>
       </div>
     </li>

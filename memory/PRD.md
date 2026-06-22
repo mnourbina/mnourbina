@@ -157,6 +157,19 @@ KHALABA is a digital maternal-infant health platform targeting Sub-Saharan Afric
 - ✅ Nav soignant enrichi : "Recherche LTFU"
 - ✅ **102/102 tests pytest passent** (97 anciens + 5 nouveaux test_iteration13_audit_export.py — CSV shape, filtres, RBAC, meta-audit, géoloc patient)
 
+## Implemented (Iteration 13 — Feb 28, 2026) — Brique 14 : Geocoder Nominatim + i18n FR/EN/AR
+- ✅ **`backend/geocoder.py`** : appel async OpenStreetMap Nominatim (gratuit, sans API key), User-Agent KHALABA, `countrycodes=td` pour biais Tchad, timeout 4s, jamais bloquant (retourne (None, None) en cas d'erreur)
+- ✅ **`POST /api/patients`** auto-géocode l'address fournie quand lat/lng absents (n'écrase JAMAIS des coords explicites). Champ `geocoded_at` ajouté
+- ✅ **`POST /api/patients/{id}/geocode`** : re-géocoder une patiente existante (utile après édition d'adresse)
+- ✅ **`pytest-asyncio==1.4.0`** + `pytest.ini` (`asyncio_mode = auto`) pour les tests unitaires async
+- ✅ **i18n complet FR/EN/AR** sur les 3 nouvelles pages :
+  - **LTFU** (`ltfu.*` — 18 clés) : title, scan_btn, mark_found, empty states, weeks_late, navigate, call, no_phone/no_address...
+  - **Audit** (`audit.*` — 16 clés) : title, columns, filters, export_csv, print, kicker
+  - **Config** (`config.*` — 28 clés) : sections Région/District/Structure, types (hopital, centre_sante...), placeholders, toasts
+  - 62 clés traduites x 3 langues = 186 traductions ajoutées
+  - RTL automatique en arabe (sidebar à droite, alignements inversés)
+- ✅ **110/110 tests pytest passent** (102 anciens + 8 nouveaux test_iteration14_geocoder.py — empty/whitespace/hit/no-result/network-error, no auto-geocode without address, explicit coords preserved)
+
 
 
 ## Backlog (P0 → P2)

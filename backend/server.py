@@ -59,6 +59,7 @@ from analytics import (
     resolve_dhis2_org_unit,
     compute_dhis2_indicators,
 )
+from geocoder import geocode_address
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("khalaba")
@@ -374,10 +375,36 @@ async def create_patient(payload: PatientIn, user=Depends(require_role("soignant
         "created_at": now_iso(),
         "created_by": user["id"],
     }
+    # Brique 14 — auto-geocode address if coords missing
+    if doc.get("address") and (doc.get("latitude") is None or doc.get("longitude") is None):
+        lat, lon = await geocode_address(doc["address"])
+        if lat is not None and lon is not None:
+            doc["latitude"] = lat
+            doc["longitude"] = lon
+            doc["geocoded_at"] = now_iso()
     await db.patients.insert_one(doc)
     doc.pop('_id', None)
     await audit(user, "CREATE", "Patient", doc["id"], new_data={"full_name": doc.get("full_name"), "zone_id": doc.get("zone_id")})
     return doc
+
+
+@api.post("/patients/{patient_id}/geocode")
+async def geocode_patient(patient_id: str, user=Depends(require_role("soignant", "admin"))):
+    """Force a re-geocoding of the patient address (e.g. after the address was edited)."""
+    p = await db.patients.find_one({"id": patient_id}, {"_id": 0})
+    if not p:
+        raise HTTPException(404, "Patient introuvable")
+    if not p.get("address"):
+        raise HTTPException(400, "Adresse absente")
+    lat, lon = await geocode_address(p["address"])
+    if lat is None:
+        raise HTTPException(422, "Adresse non géocodable")
+    await db.patients.update_one(
+        {"id": patient_id},
+        {"$set": {"latitude": lat, "longitude": lon, "geocoded_at": now_iso(), "updated_at": now_iso()}},
+    )
+    await audit(user, "GEOCODE", "Patient", patient_id, new_data={"lat": lat, "lng": lon})
+    return {"latitude": lat, "longitude": lon}
 
 
 @api.get("/patients/{patient_id}")
