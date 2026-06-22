@@ -467,6 +467,7 @@ async def list_cpn(pregnancy_id: str, user=Depends(current_user)):
 async def list_alerts(
     severity: Optional[str] = None,
     is_read: Optional[bool] = None,
+    pregnancy_id: Optional[str] = None,
     user=Depends(current_user),
 ):
     if user["role"] == "patient":
@@ -476,8 +477,9 @@ async def list_alerts(
         q["severity"] = severity
     if is_read is not None:
         q["is_read"] = is_read
-    # Zone scope for soignant
-    if user["role"] == "soignant" and user.get("zone_id"):
+    if pregnancy_id:
+        q["pregnancy_id"] = pregnancy_id
+    elif user["role"] == "soignant" and user.get("zone_id"):
         patient_ids = [p["id"] async for p in db.patients.find({"zone_id": user["zone_id"]}, {"id": 1})]
         preg_ids = [pr["id"] async for pr in db.pregnancies.find({"patient_id": {"$in": patient_ids}}, {"id": 1})]
         q["pregnancy_id"] = {"$in": preg_ids}

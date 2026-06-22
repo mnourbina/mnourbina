@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { ArrowLeft, Stethoscope, Loader2, AlertTriangle, CalendarClock, Activity } from "lucide-react";
 import { calculateDDR, calculateGestationalAge, getNextCPNDate, formatDateFr, formatDateIso } from "@/lib/pregnancyCalc";
+import AlertBanner from "@/components/app/AlertBanner";
 
 const COMPLICATIONS = [
   "Diabète gestationnel",
@@ -168,6 +169,7 @@ export default function CPNForm() {
       )}
 
       <form onSubmit={submit} className="space-y-6" data-testid="cpn-form">
+        {pregnancyId && <AlertBanner pregnancyId={pregnancyId} />}
         {/* === Bloc OMS : auto-calculs LMP / DDR / GA === */}
         {lmp && (
           <div className="bg-white rounded-2xl p-5 border-2 border-[#C85A48]/30 shadow-sm" data-testid="cpn-who-block">

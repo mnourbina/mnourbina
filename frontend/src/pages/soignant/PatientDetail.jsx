@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import api from "@/lib/api";
+import AlertBanner from "@/components/app/AlertBanner";
 import { ArrowLeft, Stethoscope, Baby, Syringe, FileText, Plus, AlertCircle, Phone, MapPin, Calendar as CalendarIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -52,7 +53,10 @@ export default function PatientDetail() {
       </header>
 
       {pregnancy ? (
-        <PregnancyView pregnancy={pregnancy} patientId={id} onUpdate={load} />
+        <>
+          <AlertBanner pregnancyId={pregnancy.id} />
+          <PregnancyView pregnancy={pregnancy} patientId={id} onUpdate={load} />
+        </>
       ) : (
         <div className="bg-[#F2C94C]/15 border-2 border-dashed border-[#F2C94C] rounded-2xl p-8 text-center">
           <AlertCircle size={28} className="mx-auto text-[#C85A48] mb-3" />
