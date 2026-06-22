@@ -1,0 +1,28 @@
+{
+  "short_name": "KHALABA",
+  "name": "KHALABA — Santé maternelle & infantile",
+  "description": "Plateforme de suivi maternel et infantile pour le Tchad — fonctionne hors ligne.",
+  "lang": "fr",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#C85A48",
+  "background_color": "#F7F3EB",
+  "categories": ["health", "medical", "productivity"]
+}

@@ -5,6 +5,7 @@ import { useI18n } from "@/i18n/I18nContext";
 import Logo from "./Logo";
 import LanguageToggle from "./LanguageToggle";
 import AuditGate from "./AuditGate";
+import OfflineIndicator from "./OfflineIndicator";
 import {
   LayoutDashboard,
   Users,
@@ -105,6 +106,9 @@ export default function AppLayout({ children }) {
 
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[#3E2723]/10 bg-white space-y-3">
           <LanguageToggle />
+          <div className="flex justify-center">
+            <OfflineIndicator />
+          </div>
           <div className="flex items-center gap-3 px-2 py-2">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#C85A48] to-[#D99A5A] flex items-center justify-center text-white font-semibold shrink-0">
               {(user?.name || "?").slice(0, 1).toUpperCase()}

@@ -111,6 +111,16 @@ KHALABA is a digital maternal-infant health platform targeting Sub-Saharan Afric
 - ✅ Bouton "Export DHIS2 JSON" ajouté à `AdminMonthlyReport.jsx` (à côté Imprimer/PDF et Export CSV)
 - ✅ **76/76 tests pytest passent** (70 anciens + 6 nouveaux test_iteration8_dhis2_report.py)
 
+## Implemented (Iteration 9 — Feb 28, 2026) — Brique 9 : PWA offline complète
+- ✅ **`manifest.json`** : KHALABA installable (name, start_url, standalone, theme #C85A48, icons 192/512 SVG)
+- ✅ **`service-worker.js`** : cache app shell (cache-first), GET /api/* (network-first + fallback cache), navigation fallback SPA, versioning + nettoyage des anciens caches. Mutations API en pass-through (déléguées à la file JS)
+- ✅ **`lib/offlineQueue.js`** : file IndexedDB `khalaba-offline` / store `outbound`. API : `enqueueRequest`, `listPending`, `pendingCount`, `removeRequest`, `markRetry`, `clearQueue`, `subscribe`, `drainQueue`. Retry cap = 5 (anti-loop).
+- ✅ **`lib/api.js`** : intercepteur axios — détecte offline (navigator.onLine === false || ERR_NETWORK) sur POST/PATCH/PUT/DELETE (sauf `/auth/*`), enqueue dans IDB et renvoie un 202 optimiste `{__queued: true}`. Drain auto sur `online` + `load`. Header `X-Offline-Replay: 1` lors du rejeu.
+- ✅ **`OfflineIndicator.jsx`** : badge sidebar — vert "En ligne" / rouge "Hors ligne · N" / ambre "Synchroniser N" (cliquable pour drain manuel). Écoute `online`/`offline`/`khalaba:sync`.
+- ✅ **`registerServiceWorker.js`** : registration auto sur `load`, scope `/`, fail-safe (HTTPS ou localhost requis)
+- ✅ `index.html` MAJ : title KHALABA, theme-color terracotta, manifest + apple-touch-icon liés
+- ✅ **81/81 tests pytest passent** (76 anciens + 5 nouveaux test_iteration9_pwa.py — manifest, SW, icons, headers offline-replay tolérés)
+
 
 
 ## Backlog (P0 → P2)
