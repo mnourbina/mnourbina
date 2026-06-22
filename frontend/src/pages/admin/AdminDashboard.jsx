@@ -6,14 +6,25 @@ import {
 } from "recharts";
 import {
   Users, Stethoscope, Baby, Syringe, AlertTriangle, Activity, Heart,
+  TrendingUp, TrendingDown, Target, ShieldCheck, Droplet, ClipboardCheck,
 } from "lucide-react";
 
 const COLORS = ["#C85A48", "#D99A5A", "#F2C94C", "#4A7C59", "#795C55"];
 
+const KPI_META = {
+  cpn4_rate: { icon: Stethoscope, color: "#C85A48" },
+  assisted_birth_rate: { icon: Baby, color: "#4A7C59" },
+  anemia_rate: { icon: Droplet, color: "#B83A2E" },
+  death_audit_rate: { icon: ClipboardCheck, color: "#795C55" },
+};
+
 export default function AdminDashboard() {
   const [data, setData] = useState(null);
+  const [kpis, setKpis] = useState(null);
+
   useEffect(() => {
     api.get("/analytics/overview").then(r => setData(r.data)).catch(() => {});
+    api.get("/admin/kpis").then(r => setKpis(r.data)).catch(() => {});
   }, []);
 
   if (!data) return <div className="text-[#795C55]">Chargement du tableau de bord…</div>;
@@ -28,6 +39,21 @@ export default function AdminDashboard() {
         </h1>
         <p className="mt-2 text-[#795C55]">Vue d'ensemble nationale — République du Tchad.</p>
       </header>
+
+      {/* === Brique 5 — KPIs UNFPA === */}
+      {kpis && (
+        <section data-testid="admin-kpis-section">
+          <div className="flex items-center gap-2 mb-4">
+            <Target size={18} className="text-[#C85A48]" />
+            <h2 className="font-heading text-lg font-semibold text-[#3E2723]">
+              Indicateurs clés UNFPA / OMS
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {kpis.kpis.map(k => <KpiCard key={k.code} kpi={k} />)}
+          </div>
+        </section>
+      )}
 
       <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Kpi icon={Users} label="Patientes" value={t.patients} color="#C85A48" />
@@ -108,6 +134,52 @@ function Kpi({ icon: Icon, label, value, color }) {
       </div>
       <div className="mt-4 text-xs uppercase tracking-wider text-[#795C55]">{label}</div>
       <div className="font-heading text-2xl font-semibold text-[#3E2723] mt-1">{value}</div>
+    </div>
+  );
+}
+
+function KpiCard({ kpi }) {
+  const meta = KPI_META[kpi.code] || { icon: ShieldCheck, color: "#795C55" };
+  const Icon = meta.icon;
+  const onTrack = kpi.on_track;
+  const targetLabel = kpi.target_direction === "lower"
+    ? `Cible ≤ ${kpi.target}%`
+    : `Cible ≥ ${kpi.target}%`;
+  const Trend = onTrack ? TrendingUp : TrendingDown;
+  const trendColor = onTrack ? "#4A7C59" : "#B83A2E";
+  const trendBg = onTrack ? "bg-[#4A7C59]/10" : "bg-[#B83A2E]/10";
+
+  return (
+    <div
+      data-testid={`kpi-card-${kpi.code}`}
+      className="bg-white rounded-2xl p-5 border border-[#3E2723]/5 flex flex-col gap-3"
+    >
+      <div className="flex items-start justify-between">
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center text-white" style={{ backgroundColor: meta.color }}>
+          <Icon size={18} />
+        </div>
+        <span
+          className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${trendBg}`}
+          style={{ color: trendColor }}
+          data-testid={`kpi-status-${kpi.code}`}
+        >
+          <Trend size={12} />
+          {onTrack ? "Sur cible" : "Hors cible"}
+        </span>
+      </div>
+      <div>
+        <div className="text-xs uppercase tracking-wider text-[#795C55]">{kpi.label}</div>
+        <div className="mt-1 flex items-baseline gap-1">
+          <span className="font-heading text-3xl font-semibold text-[#3E2723]" data-testid={`kpi-value-${kpi.code}`}>
+            {kpi.value}
+          </span>
+          <span className="text-sm text-[#795C55]">{kpi.unit}</span>
+        </div>
+        <div className="mt-1 text-xs text-[#795C55]">
+          {kpi.numerator} / {kpi.denominator || 0} — {targetLabel}
+        </div>
+      </div>
+      <p className="text-xs text-[#795C55] leading-snug">{kpi.description}</p>
     </div>
   );
 }

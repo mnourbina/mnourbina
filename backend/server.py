@@ -835,6 +835,166 @@ async def analytics_overview(user=Depends(require_role("admin"))):
 
 
 # ============================================================
+# ADMIN KPIs (Brique 5) — UNFPA-aligned high-level indicators
+# ============================================================
+# UNFPA / OMS targets reference:
+#   - CPN4 coverage ≥ 75%
+#   - Skilled / assisted birth ≥ 85%
+#   - Anaemia in pregnancy ≤ 20%
+#   - MPDSR audited within 30 days ≥ 95%
+UNFPA_TARGETS = {
+    "cpn4_rate": 75.0,
+    "assisted_birth_rate": 85.0,
+    "anemia_rate": 20.0,         # max acceptable (lower is better)
+    "death_audit_rate": 95.0,
+}
+
+
+@api.get("/admin/kpis")
+async def admin_kpis(
+    zone_id: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    user=Depends(require_role("admin")),
+):
+    """Return the 4 UNFPA-aligned KPIs with their UNFPA target and on/off-track status.
+
+    Filters:
+      - zone_id: limit aggregation to a single zone sanitaire
+      - date_from / date_to: ISO date range (YYYY-MM-DD) on visit/death dates
+    """
+    # Scope filtering (zone-aware)
+    patient_ids = await _patient_ids_in_zone(zone_id) if zone_id else None
+    pregnancy_ids = await _pregnancy_ids_for_patients(patient_ids) if patient_ids is not None else None
+
+    # Date range
+    dq: dict = {}
+    if date_from:
+        dq["$gte"] = date_from
+    if date_to:
+        dq["$lte"] = date_to
+
+    preg_q: dict = {}
+    cpn_q: dict = {}
+    pn_q: dict = {"stage": "6h"}
+    mpdsr_q: dict = {}
+    if patient_ids is not None:
+        preg_q["patient_id"] = {"$in": patient_ids}
+        mpdsr_q["patient_id"] = {"$in": patient_ids}
+    if pregnancy_ids is not None:
+        cpn_q["pregnancy_id"] = {"$in": pregnancy_ids}
+        pn_q["pregnancy_id"] = {"$in": pregnancy_ids}
+    if dq:
+        cpn_q["visit_date"] = dq
+        pn_q["visit_date"] = dq
+        mpdsr_q["death_date"] = dq
+
+    total_pregnancies = await db.pregnancies.count_documents(preg_q)
+
+    # KPI 1 — CPN4 rate
+    pipeline_cpn4 = [
+        {"$match": cpn_q} if cpn_q else {"$match": {}},
+        {"$group": {"_id": "$pregnancy_id", "n": {"$sum": 1}}},
+        {"$match": {"n": {"$gte": 4}}},
+        {"$count": "total"},
+    ]
+    cpn4_doc = await db.cpn_visits.aggregate(pipeline_cpn4).to_list(1)
+    cpn4 = cpn4_doc[0]["total"] if cpn4_doc else 0
+
+    # KPI 2 — Assisted birth rate (proxy = postnatal visit at 6h means delivery was followed in-facility)
+    assisted_births = await db.postnatal_visits.count_documents(pn_q)
+
+    # KPI 3 — Anaemia rate (Hb < 11) over screened CPNs
+    anemia_screened = await db.cpn_visits.count_documents({**cpn_q, "hemoglobin": {"$ne": None, "$gt": 0}})
+    anemia_cases = await db.cpn_visits.count_documents({**cpn_q, "hemoglobin": {"$lt": 11, "$gt": 0}})
+
+    # KPI 4 — MPDSR audit < 30 days
+    total_deaths = await db.mpdsr_reports.count_documents(mpdsr_q)
+    audited_in_30d = 0
+    async for r in db.mpdsr_reports.find(
+        {**mpdsr_q, "audit_status": "audite_en_comite", "audit_date": {"$ne": None}},
+        {"_id": 0, "death_date": 1, "audit_date": 1},
+    ):
+        try:
+            dd = datetime.fromisoformat(r["death_date"])
+            ad = datetime.fromisoformat(r["audit_date"])
+            if (ad - dd).days <= 30:
+                audited_in_30d += 1
+        except Exception:
+            continue
+
+    def rate(num, den):
+        return round((num / den * 100) if den else 0.0, 1)
+
+    cpn4_rate = rate(cpn4, total_pregnancies)
+    assisted_birth_rate = rate(assisted_births, total_pregnancies)
+    anemia_rate = rate(anemia_cases, anemia_screened)
+    death_audit_rate = rate(audited_in_30d, total_deaths)
+
+    kpis = [
+        {
+            "code": "cpn4_rate",
+            "label": "Taux CPN4+",
+            "description": "Grossesses avec au moins 4 consultations prénatales",
+            "value": cpn4_rate,
+            "unit": "%",
+            "numerator": cpn4,
+            "denominator": total_pregnancies,
+            "target": UNFPA_TARGETS["cpn4_rate"],
+            "target_direction": "higher",
+            "on_track": cpn4_rate >= UNFPA_TARGETS["cpn4_rate"],
+        },
+        {
+            "code": "assisted_birth_rate",
+            "label": "Accouchement assisté",
+            "description": "Naissances suivies d'une visite postnatale 6h en structure",
+            "value": assisted_birth_rate,
+            "unit": "%",
+            "numerator": assisted_births,
+            "denominator": total_pregnancies,
+            "target": UNFPA_TARGETS["assisted_birth_rate"],
+            "target_direction": "higher",
+            "on_track": assisted_birth_rate >= UNFPA_TARGETS["assisted_birth_rate"],
+        },
+        {
+            "code": "anemia_rate",
+            "label": "Taux d'anémie",
+            "description": "Femmes enceintes dépistées avec Hb < 11 g/dL",
+            "value": anemia_rate,
+            "unit": "%",
+            "numerator": anemia_cases,
+            "denominator": anemia_screened,
+            "target": UNFPA_TARGETS["anemia_rate"],
+            "target_direction": "lower",
+            "on_track": anemia_rate <= UNFPA_TARGETS["anemia_rate"],
+        },
+        {
+            "code": "death_audit_rate",
+            "label": "Audit décès < 30j",
+            "description": "Décès maternels et néonatals audités en comité MPDSR sous 30 jours",
+            "value": death_audit_rate,
+            "unit": "%",
+            "numerator": audited_in_30d,
+            "denominator": total_deaths,
+            "target": UNFPA_TARGETS["death_audit_rate"],
+            "target_direction": "higher",
+            "on_track": death_audit_rate >= UNFPA_TARGETS["death_audit_rate"],
+        },
+    ]
+
+    return {
+        "scope": {"zone_id": zone_id, "date_from": date_from, "date_to": date_to},
+        "totals": {
+            "pregnancies": total_pregnancies,
+            "deaths": total_deaths,
+            "anemia_screened": anemia_screened,
+        },
+        "kpis": kpis,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+# ============================================================
 # DHIS2 / MSP Indicators
 # ============================================================
 DHIS2_INDICATOR_DEFS = [

@@ -75,6 +75,18 @@ KHALABA is a digital maternal-infant health platform targeting Sub-Saharan Afric
 - ✅ **55/55 tests pytest passent**
 - ⚪ Hiérarchie Region/District/Facility (c) et AuditLog générique (e) reportés à une itération dédiée
 
+## Implemented (Iteration 6 — Feb 28, 2026) — Brique 5 : Admin KPIs UNFPA
+- ✅ **Endpoint `GET /api/admin/kpis`** (admin only) avec filtres `zone_id`, `date_from`, `date_to`
+- ✅ 4 KPIs alignés UNFPA/OMS, chacun avec numerator/denominator/target/target_direction/on_track :
+  - `cpn4_rate` : Taux CPN4+ (cible ≥ 75%)
+  - `assisted_birth_rate` : Accouchement assisté (cible ≥ 85%, proxy visite postnatale 6h)
+  - `anemia_rate` : Taux d'anémie Hb<11 sur dépistées (cible ≤ 20%, lower-is-better)
+  - `death_audit_rate` : Décès audités MPDSR sous 30 jours (cible ≥ 95%)
+- ✅ Dashboard admin (`/app/admin`) enrichi avec section "Indicateurs clés UNFPA / OMS" : 4 cartes KpiCard avec badges Sur cible / Hors cible, icônes contextuelles, ratio num/den
+- ✅ Bug fix : code orphelin en fin de `MPDSRPage.jsx` (compile error qui bloquait le frontend) supprimé
+- ✅ **62/62 tests pytest passent** (55 anciens + 7 nouveaux test_iteration5_admin_kpis.py)
+
+
 ## Backlog (P0 → P2)
 - P1: Appointments scheduler with calendar UI (model exists, UI is a list)
 - P1: Patient portal — display her own CPN visits, vaccination calendar of her baby

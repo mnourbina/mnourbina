@@ -250,20 +250,3 @@ export default function MPDSRPage() {
     </div>
   );
 }
-/15 text-[#4A7C59]" :
-                      r.audit_status === "en_attente" ? "bg-[#F2C94C]/30 text-[#3E2723]" :
-                      "bg-[#3E2723]/10 text-[#795C55]"
-                    }`}>
-                      {r.audit_status || "non_audite"}
-                    </span>
-                    {r.audit_date && <div className="text-xs text-[#795C55] mt-1">{r.audit_date}</div>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
-    </div>
-  );
-}
