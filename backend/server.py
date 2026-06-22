@@ -86,6 +86,77 @@ def require_role(*roles):
 
 
 # ============================================================
+# Admin tiers (Brique 15)
+# ============================================================
+# Four levels of admin, stored as `admin_level` on the user document:
+#   - "district"  → scoped to user.admin_zone_id
+#   - "region"    → scoped to user.admin_region_id (all districts of that region)
+#   - "national"  → no scope filter (sees everything)
+#   - "super"     → no scope filter + can mutate config (regions/districts/structures)
+ADMIN_LEVELS = ("district", "region", "national", "super")
+SUPER_ADMIN_LEVELS = ("super",)
+CONFIG_ADMIN_LEVELS = ("super",)
+
+
+def require_super_admin():
+    async def dep(user=Depends(current_user)):
+        if user.get("role") != "admin" or user.get("admin_level") not in CONFIG_ADMIN_LEVELS:
+            raise HTTPException(403, "Réservé au Super administrateur")
+        return user
+    return dep
+
+
+async def enforce_admin_zone_scope(user: dict, requested_zone_id: Optional[str]) -> Optional[str]:
+    """For endpoints that accept a single `zone_id` query, enforce admin scope:
+    - district admins → forced to their admin_zone_id (overrides any requested)
+    - region admins → must request a zone in their region (else first zone of region)
+    - national/super → free
+    Returns the effective zone_id to use, or None for "no filter".
+    """
+    allowed = await admin_scope(user)  # None = global
+    if allowed is None:
+        return requested_zone_id  # no restriction
+    if not requested_zone_id:
+        # No specific zone asked → for single-zone endpoints, return first allowed
+        return allowed[0] if allowed else None
+    if requested_zone_id not in allowed:
+        raise HTTPException(403, "Zone hors de votre périmètre")
+    return requested_zone_id
+
+
+
+async def admin_scope(user: dict) -> Optional[List[str]]:
+    """Brique 15 — Return list of zone_ids the user can see, or None for global access.
+    Used by analytics/reports endpoints to filter their aggregation pipelines.
+
+    For soignant users, returns [user.zone_id] (existing behaviour).
+    For admins, returns based on `admin_level`:
+        national / super → None (no filter)
+        region           → all zone_ids in admin_region_id
+        district         → [admin_zone_id]
+    Legacy admins without admin_level default to None (full access — backward compat).
+    """
+    if not user:
+        return None
+    role = user.get("role")
+    if role == "soignant" and user.get("zone_id"):
+        return [user["zone_id"]]
+    if role != "admin":
+        return None
+    level = user.get("admin_level")
+    if level in (None, "national", "super"):
+        return None
+    if level == "district":
+        return [user.get("admin_zone_id")] if user.get("admin_zone_id") else None
+    if level == "region":
+        rid = user.get("admin_region_id")
+        if not rid:
+            return None
+        return [z["id"] async for z in db.zones.find({"region_id": rid}, {"id": 1})]
+    return None
+
+
+# ============================================================
 # Audit log helper (Brique 10 — generic audit trail)
 # ============================================================
 async def audit(user: Optional[dict], action: str, entity: str, entity_id: Optional[str] = None,
