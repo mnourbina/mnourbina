@@ -1,0 +1,42 @@
+{
+  "summary": "First-iteration full-stack testing of KHALABA MVP. Created 21 pytest backend tests covering auth/OTP, zones, structures, patients, pregnancies, CPN (with alerts), postnatal (with alerts), children, vaccinations, MPDSR, admin analytics, register, logout. After fixing a CRITICAL backend bug where all POST endpoints returned 500 due to MongoDB ObjectId in response, all 21 backend tests pass. Frontend: landing page renders with KHALABA branding & French copy; 2-step OTP login flow works for admin/soignant/patient and role-based redirect is correct; admin dashboard renders KPIs + BarChart + PieChart (3 Recharts SVGs); soignant patient list + patient detail + open-pregnancy (window.prompt date) + CPN form all working end-to-end; logout clears cookies and returns to /.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin dashboard (initial render)", "issues": ["Recharts logs width(-1)/height(-1) warnings during first paint; charts render correctly afterwards. Consider giving ResponsiveContainer an explicit minHeight to avoid the console warning."]},
+      {"screen": "CPN form", "issues": ["Uses native browser date input (<input type=date>) rather than a styled shadcn calendar — acceptable for MVP, but inconsistent with the rest of the design system."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_khalaba_api.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(FIXED by testing agent) Backend POST endpoints were returning 500 because motor.insert_one mutates the doc to add ObjectId _id, which then fails JSON serialization. Patched /app/backend/server.py to pop _id after every insert_one(doc) and to exclude _id from the register endpoint's public payload. Please verify the patch matches your style preferences (alternative: use a wrapper helper, or pass a copy to insert_one).",
+    "Consider giving Recharts ResponsiveContainer an explicit min-height in AdminDashboard.jsx to silence width/height(-1) warnings on first paint.",
+    "MPDSR model requires place_of_death and medical_cause (not 'location'/'cause_probable'). Frontend MPDSRPage.jsx should be cross-checked to ensure it submits the correct field names."
+  ],
+  "critical_code_review_comments": [
+    "CRITICAL FIXED: All POST endpoints (zones, structures, patients, pregnancies, cpn-visits, postnatal-visits, children, vaccinations, mpdsr, appointments, register) returned 500 because they returned the doc after insert_one — and motor mutates the dict to add the bson ObjectId _id, which FastAPI cannot serialize. Pattern fix applied: doc.pop('_id', None) after each insert_one(doc).",
+    "OTP code is returned in the API response (intentional demo mode per problem statement) — fine for MVP but must be removed before production.",
+    "CORS configured with allow_origins=['*'] AND allow_credentials=True — browsers will reject Set-Cookie with wildcard origin. The allow_origin_regex='.*' also yields '*' in some setups. For production, set an explicit origin list.",
+    "Auth analytics endpoint does N+1 queries (per zone, per pregnancy) — fine for low cardinality but should be replaced with an aggregation pipeline at scale.",
+    "server.py is 627 lines — recommend splitting routes into modules (auth, patients, pregnancies, analytics) before it grows."
+  ],
+  "updated_files": [
+    "/app/backend/server.py (added doc.pop('_id', None) after every insert_one and excluded _id from register response)",
+    "/app/backend/tests/test_khalaba_api.py (new pytest test suite)"
+  ],
+  "success_rate": {"backend": "100% (21/21)", "frontend": "100% of tested critical flows"},
+  "test_credentials": "admin@khalaba.health / khalaba2026, sagefemme@khalaba.health / khalaba2026, maman@khalaba.health / khalaba2026",
+  "seed_data_creation": "Tests created TEST_-prefixed zones, patients, pregnancies, CPN visits, postnatal visits, children, vaccinations, MPDSR reports, and a TEST soignant user via /api/auth/register. These remain in the database and are visible in the soignant dashboard / admin analytics. Cleanup is not implemented yet.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend fully tested via /app/backend/tests/test_khalaba_api.py — re-run with: pytest /app/backend/tests/test_khalaba_api.py -v. Frontend critical flows (landing, OTP login per role, admin dashboard charts, soignant patient list + patient detail + open pregnancy + CPN form) verified manually. Remaining frontend areas NOT yet tested in depth: Register page (/register), NewPatient form submission, full CPN form submission with alerts surface in UI, Postnatal form, Vaccination form, MPDSR page form, Appointments/Agenda pages, Patient portal sub-pages (PatientAgenda, PatientBaby), AdminConfig page. The OTP is displayed inline on Step 2 (intentional demo).",
+  "rca of the issue": "Root cause of the 500s: motor's AsyncIOMotorCollection.insert_one mutates the input dict in-place by injecting a BSON ObjectId under the '_id' key. The route handlers then returned that same dict, and FastAPI's jsonable_encoder cannot serialize bson.ObjectId, raising ValueError. Mitigation: after each insert_one(doc), call doc.pop('_id', None) (or pass doc.copy() to insert_one). Applied across all 10 POST endpoints in server.py and the register endpoint's response builder. Verified by re-running the pytest suite — all 21 tests now pass."
+}

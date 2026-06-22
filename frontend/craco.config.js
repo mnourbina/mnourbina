@@ -61,6 +61,14 @@ let webpackConfig = {
 };
 
 webpackConfig.devServer = (devServerConfig) => {
+  // Strip deprecated WDS 4 options (CRA 5 still emits them, but WDS 5 rejects)
+  delete devServerConfig.onAfterSetupMiddleware;
+  delete devServerConfig.onBeforeSetupMiddleware;
+  if (devServerConfig.https !== undefined) {
+    devServerConfig.server = devServerConfig.https ? 'https' : 'http';
+    delete devServerConfig.https;
+  }
+
   // Add health check endpoints if enabled
   if (config.enableHealthCheck && setupHealthEndpoints && healthPluginInstance) {
     const originalSetupMiddlewares = devServerConfig.setupMiddlewares;

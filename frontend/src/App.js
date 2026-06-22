@@ -1,55 +1,105 @@
-import { useEffect } from "react";
+import React from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "@/components/ui/sonner";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
+import ProtectedRoute from "@/components/app/ProtectedRoute";
+import AppLayout from "@/components/app/AppLayout";
+
+import Landing from "@/pages/Landing";
+import Login from "@/pages/Login";
+import Register from "@/pages/Register";
+
+import PatientDashboard from "@/pages/patient/PatientDashboard";
+import PatientAgenda from "@/pages/patient/PatientAgenda";
+import PatientBaby from "@/pages/patient/PatientBaby";
+
+import SoignantDashboard from "@/pages/soignant/SoignantDashboard";
+import PatientList from "@/pages/soignant/PatientList";
+import PatientDetail from "@/pages/soignant/PatientDetail";
+import NewPatient from "@/pages/soignant/NewPatient";
+import CPNForm from "@/pages/soignant/CPNForm";
+import PostnatalForm from "@/pages/soignant/PostnatalForm";
+import VaccinationForm from "@/pages/soignant/VaccinationForm";
+import MPDSRPage from "@/pages/soignant/MPDSRPage";
+import SoignantAgenda from "@/pages/soignant/SoignantAgenda";
+
+import AdminDashboard from "@/pages/admin/AdminDashboard";
+import AdminConfig from "@/pages/admin/AdminConfig";
+
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
-import { HOME } from "@/constants/testIds";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
-
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
-
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          data-testid={HOME.emergentLink}
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
-};
+function RoleHome() {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === "admin") return <Navigate to="/app/admin" replace />;
+  if (user.role === "soignant") return <Navigate to="/app/soignant" replace />;
+  return <Navigate to="/app/patient" replace />;
+}
 
 function App() {
   return (
-    <div className="App">
+    <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+
+          <Route
+            path="/app"
+            element={
+              <ProtectedRoute>
+                <AppLayout><RoleHome /></AppLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Patient routes */}
+          <Route
+            path="/app/patient"
+            element={
+              <ProtectedRoute roles={["patient"]}>
+                <AppLayout><PatientDashboard /></AppLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/patient/agenda"
+            element={
+              <ProtectedRoute roles={["patient"]}>
+                <AppLayout><PatientAgenda /></AppLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/app/patient/bebe"
+            element={
+              <ProtectedRoute roles={["patient"]}>
+                <AppLayout><PatientBaby /></AppLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Soignant routes */}
+          <Route path="/app/soignant" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><SoignantDashboard /></AppLayout></ProtectedRoute>} />
+          <Route path="/app/soignant/patients" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><PatientList /></AppLayout></ProtectedRoute>} />
+          <Route path="/app/soignant/patients/new" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><NewPatient /></AppLayout></ProtectedRoute>} />
+          <Route path="/app/soignant/patients/:id" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><PatientDetail /></AppLayout></ProtectedRoute>} />
+          <Route path="/app/soignant/patients/:id/cpn" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><CPNForm /></AppLayout></ProtectedRoute>} />
+          <Route path="/app/soignant/patients/:id/postnatal" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><PostnatalForm /></AppLayout></ProtectedRoute>} />
+          <Route path="/app/soignant/patients/:id/vaccination" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><VaccinationForm /></AppLayout></ProtectedRoute>} />
+          <Route path="/app/soignant/mpdsr" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><MPDSRPage /></AppLayout></ProtectedRoute>} />
+          <Route path="/app/soignant/agenda" element={<ProtectedRoute roles={["soignant","admin"]}><AppLayout><SoignantAgenda /></AppLayout></ProtectedRoute>} />
+
+          {/* Admin */}
+          <Route path="/app/admin" element={<ProtectedRoute roles={["admin"]}><AppLayout><AdminDashboard /></AppLayout></ProtectedRoute>} />
+          <Route path="/app/admin/config" element={<ProtectedRoute roles={["admin"]}><AppLayout><AdminConfig /></AppLayout></ProtectedRoute>} />
+
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <Toaster richColors position="top-right" />
       </BrowserRouter>
-    </div>
+    </AuthProvider>
   );
 }
 
