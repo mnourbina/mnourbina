@@ -1034,6 +1034,81 @@ async def list_audit_logs(limit: int = 50, user=Depends(require_role("admin"))):
     return await db.audit_logs.find({}, {"_id": 0}).sort("created_at", -1).to_list(limit)
 
 
+@api.get("/reports/district")
+async def district_monthly_report(
+    month: int,
+    year: int,
+    zone_id: Optional[str] = None,
+    user=Depends(require_role("admin")),
+):
+    if month < 1 or month > 12:
+        raise HTTPException(400, "Mois invalide (1-12)")
+    first = datetime(year, month, 1).date().isoformat()
+    last_dt = datetime(year + 1, 1, 1).date() if month == 12 else datetime(year, month + 1, 1).date()
+    last = (last_dt - timedelta(days=1)).isoformat()
+
+    patient_ids = await _patient_ids_in_zone(zone_id) if zone_id else None
+    cpn_q: dict = {"visit_date": {"$gte": first, "$lte": last}}
+    preg_q: dict = {"created_at": {"$gte": first, "$lte": last + "T23:59:59"}}
+    pn_q: dict = {"visit_date": {"$gte": first, "$lte": last}, "stage": "6h"}
+    mpdsr_q: dict = {"death_date": {"$gte": first, "$lte": last}}
+    if patient_ids is not None:
+        preg_q["patient_id"] = {"$in": patient_ids}
+        preg_ids_zone = await _pregnancy_ids_for_patients(patient_ids)
+        cpn_q["pregnancy_id"] = {"$in": preg_ids_zone}
+        pn_q["pregnancy_id"] = {"$in": preg_ids_zone}
+        mpdsr_q["patient_id"] = {"$in": patient_ids}
+
+    total_pregnancies = await db.pregnancies.count_documents(preg_q)
+    cpn1 = await db.cpn_visits.count_documents({**cpn_q, "visit_number": 1})
+    pipeline_cpn4 = [{"$match": cpn_q}, {"$group": {"_id": "$pregnancy_id", "c": {"$sum": 1}}}, {"$match": {"c": {"$gte": 4}}}, {"$count": "n"}]
+    cpn4_doc = await db.cpn_visits.aggregate(pipeline_cpn4).to_list(1)
+    cpn4 = cpn4_doc[0]["n"] if cpn4_doc else 0
+    assisted_births = await db.postnatal_visits.count_documents(pn_q)
+    anemia_screened = await db.cpn_visits.count_documents({**cpn_q, "hemoglobin": {"$ne": None, "$gt": 0}})
+    anemia_cases = await db.cpn_visits.count_documents({**cpn_q, "hemoglobin": {"$lt": 11, "$gt": 0}})
+    hiv_tested = await db.cpn_visits.count_documents({**cpn_q, "hiv_status": {"$in": ["negatif", "positif", "NEG", "POS"]}})
+    hiv_positive = await db.cpn_visits.count_documents({**cpn_q, "hiv_status": {"$in": ["positif", "POS"]}})
+    syph_tested = await db.cpn_visits.count_documents({**cpn_q, "syphilis_status": {"$in": ["negatif", "positif", "NEG", "POS"]}})
+    maternal_deaths = await db.mpdsr_reports.count_documents({**mpdsr_q, "death_type": "maternelle"})
+    neonatal_deaths = await db.mpdsr_reports.count_documents({**mpdsr_q, "death_type": {"$in": ["neonatale", "foetal_in_utero"]}})
+    audits_completed = await db.mpdsr_reports.count_documents({**mpdsr_q, "audit_status": "audite_en_comite"})
+    ltfu_count = await db.pregnancies.count_documents({**(preg_q if patient_ids is not None else {}), "status": "perdue_vue"})
+
+    def rate(num, den):
+        return round((num / den * 100) if den else 0, 1)
+
+    return {
+        "month": f"{year}-{month:02d}",
+        "year": year,
+        "month_num": month,
+        "zone_id": zone_id,
+        "period": {"date_from": first, "date_to": last},
+        "indicators": {
+            "totalPregnancies": total_pregnancies,
+            "cpn1": cpn1,
+            "cpn4": cpn4,
+            "assistedBirths": assisted_births,
+            "anemiaScreened": anemia_screened,
+            "anemiaCases": anemia_cases,
+            "hivTested": hiv_tested,
+            "hivPositive": hiv_positive,
+            "syphilisTested": syph_tested,
+            "maternalDeaths": maternal_deaths,
+            "neonatalDeaths": neonatal_deaths,
+            "auditsCompleted": audits_completed,
+        },
+        "ltfuCount": ltfu_count,
+        "coverageRates": {
+            "cpn1": rate(cpn1, total_pregnancies),
+            "cpn4": rate(cpn4, total_pregnancies),
+            "assistedBirth": rate(assisted_births, total_pregnancies),
+        },
+        "targets": {"cpn1": 90, "cpn4": 80, "assistedBirth": 90, "auditCoverage": 100},
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 @api.get("/analytics/dhis2-indicators/export.csv")
 async def dhis2_indicators_csv(
     zone_id: Optional[str] = None,
