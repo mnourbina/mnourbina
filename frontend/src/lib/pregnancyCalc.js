@@ -44,6 +44,66 @@ export const WHO_CPN_SCHEDULE = [
 ];
 
 /**
+ * WHO 8-contact ANC schedule with windows (weekMin / weekMax).
+ * Used by `getNextCPN()` for window-aware scheduling (Brique 6).
+ */
+export const CPN_SCHEDULE_OMS = [
+  { number: 1, weekMin: 0,  weekMax: 12, label: "CPN1 — 1er trimestre" },
+  { number: 2, weekMin: 20, weekMax: 24, label: "CPN2 — 2ème trimestre" },
+  { number: 3, weekMin: 26, weekMax: 30, label: "CPN3 — 2ème trimestre" },
+  { number: 4, weekMin: 30, weekMax: 34, label: "CPN4 — 3ème trimestre" },
+  { number: 5, weekMin: 34, weekMax: 36, label: "CPN5 — 3ème trimestre" },
+  { number: 6, weekMin: 36, weekMax: 38, label: "CPN6 — 3ème trimestre" },
+  { number: 7, weekMin: 38, weekMax: 40, label: "CPN7 — 3ème trimestre" },
+  { number: 8, weekMin: 40, weekMax: 42, label: "CPN8 — Post-terme" },
+];
+
+/**
+ * Window-aware next CPN selector (Brique 6).
+ * @param {string} lmpStr - LMP ISO date
+ * @param {number[]} doneCpnNumbers - numbers of CPNs already done
+ * @returns {object|null} {number, label, weekMin, weekMax, recommendedDate, currentWeek, daysLate}
+ */
+export function getNextCPN(lmpStr, doneCpnNumbers = []) {
+  if (!lmpStr) return null;
+  const ga = calculateGestationalAge(lmpStr);
+  if (!ga) return null;
+  const weeks = ga.weeks;
+  const done = new Set(doneCpnNumbers);
+
+  // 1. Prefer the contact whose window contains current GA and that isn't done.
+  let next = CPN_SCHEDULE_OMS.find(
+    cpn => weeks >= cpn.weekMin && weeks <= cpn.weekMax && !done.has(cpn.number)
+  );
+
+  // 2. Fallback: next undone contact after current week
+  if (!next) {
+    next = CPN_SCHEDULE_OMS.find(cpn => !done.has(cpn.number) && cpn.weekMin >= weeks);
+  }
+  // 3. Fallback: any undone (we're past schedule)
+  if (!next) {
+    next = CPN_SCHEDULE_OMS.find(cpn => !done.has(cpn.number));
+  }
+  if (!next) return null;
+
+  const lmp = new Date(lmpStr);
+  const midWeek = Math.floor((next.weekMin + next.weekMax) / 2);
+  const recommendedDate = new Date(lmp);
+  recommendedDate.setDate(recommendedDate.getDate() + midWeek * 7);
+
+  return {
+    ...next,
+    recommendedDate,
+    currentWeek: weeks,
+    daysLate: weeks > next.weekMax ? (weeks - next.weekMax) * 7 : 0,
+  };
+}
+
+export function isCPNOverdue(nextCPN) {
+  return !!(nextCPN && nextCPN.daysLate > 7);
+}
+
+/**
  * Given the LMP and current CPN number just done, returns the date
  * recommended for the NEXT contact (CPN n+1) per WHO.
  */

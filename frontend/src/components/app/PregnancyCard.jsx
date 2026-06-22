@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import api from "@/lib/api";
-import { calculateGestationalAge, calculateDDR, getNextCPNDate, formatDateFr } from "@/lib/pregnancyCalc";
+import { calculateGestationalAge, calculateDDR, getNextCPN, isCPNOverdue, formatDateFr } from "@/lib/pregnancyCalc";
 import { AlertTriangle, Phone, FileText, Plus, Clock, CheckCircle2, MapPin } from "lucide-react";
 
 const STATUS_COLORS = {
@@ -25,12 +25,14 @@ export default function PregnancyCard({ pregnancy, onUpdate }) {
   const ddr = calculateDDR(lmp);
   const lastCpn = pregnancy.last_cpn;
   const lastCpnNum = lastCpn?.visit_number || 0;
-  const nextCpn = getNextCPNDate(lmp, lastCpnNum);
-  const nextCpnDate = nextCpn?.date instanceof Date ? nextCpn.date : (nextCpn instanceof Date ? nextCpn : null);
+  const doneCpns = pregnancy.done_cpns || (lastCpnNum ? Array.from({ length: lastCpnNum }, (_, i) => i + 1) : []);
+  const cpnCount = pregnancy.cpn_count ?? doneCpns.length;
+  const nextCpn = getNextCPN(lmp, doneCpns);
+  const nextCpnDate = nextCpn?.recommendedDate || null;
   const nextCpnLabel = nextCpn?.label;
-  const daysLate = nextCpnDate ? Math.floor((Date.now() - nextCpnDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
-  const isOverdue = nextCpnDate && daysLate > 7;
-  const isUrgent = nextCpnDate && daysLate > 14;
+  const daysLate = nextCpn?.daysLate || 0;
+  const isOverdue = isCPNOverdue(nextCpn);
+  const isUrgent = nextCpn && nextCpn.daysLate > 14;
 
   const status = pregnancy.status || "en_cours";
   const isLTFU = status === "perdue_vue";
@@ -83,7 +85,7 @@ export default function PregnancyCard({ pregnancy, onUpdate }) {
             {isUrgent ? <AlertTriangle size={18} className="text-[#B83A2E]" /> : <Clock size={18} className="text-[#795C55]" />}
             <div className="min-w-0">
               <div className={`font-semibold text-sm ${isUrgent ? "text-[#B83A2E]" : "text-[#3E2723]"}`}>
-                {nextCpnLabel.split(" — ")[0]} en retard de {daysLate} jours
+                {nextCpnLabel.split(" — ")[0]} en retard de {Math.floor(daysLate / 7)} semaine(s)
               </div>
               <div className="text-xs text-[#795C55]">Date recommandée : {formatDateFr(nextCpnDate)}</div>
             </div>
@@ -113,6 +115,20 @@ export default function PregnancyCard({ pregnancy, onUpdate }) {
           </div>
         </div>
       )}
+
+      {/* CPN progress bar (Brique 6 — WHO 8 contacts) */}
+      <div className="mt-1 mb-4" data-testid={`cpn-progress-${pregnancy.id}`}>
+        <div className="flex justify-between text-[11px] text-[#795C55] mb-1">
+          <span className="uppercase tracking-wider">Progression CPN</span>
+          <span className="font-semibold text-[#3E2723]">{Math.min(cpnCount, 8)} / 8</span>
+        </div>
+        <div className="w-full bg-[#F7F3EB] rounded-full h-2 overflow-hidden">
+          <div
+            className="bg-[#C85A48] h-2 rounded-full transition-all"
+            style={{ width: `${Math.min((cpnCount / 8) * 100, 100)}%` }}
+          />
+        </div>
+      </div>
 
       {/* Actions */}
       <div className="flex gap-2">

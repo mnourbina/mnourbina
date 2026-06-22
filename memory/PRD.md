@@ -86,6 +86,15 @@ KHALABA is a digital maternal-infant health platform targeting Sub-Saharan Afric
 - ✅ Bug fix : code orphelin en fin de `MPDSRPage.jsx` (compile error qui bloquait le frontend) supprimé
 - ✅ **62/62 tests pytest passent** (55 anciens + 7 nouveaux test_iteration5_admin_kpis.py)
 
+## Implemented (Iteration 6b — Feb 28, 2026) — Calendrier OMS fenêtré + Progression CPN
+- ✅ **Nouveau `CPN_SCHEDULE_OMS`** (lib/pregnancyCalc.js) avec fenêtres `weekMin`/`weekMax` pour chacun des 8 contacts OMS (1er trim, 20-24, 26-30, 30-34, 34-36, 36-38, 38-40, 40-42)
+- ✅ **`getNextCPN(lmpStr, doneCpnNumbers[])`** : sélectionne la prochaine CPN selon (1) fenêtre contenant l'âge gestationnel courant ET non faite, (2) fallback prochaine non-faite après cette semaine, (3) tout undone restant. Retourne `recommendedDate` (milieu fenêtre), `currentWeek`, `daysLate` (uniquement si on a dépassé `weekMax`)
+- ✅ **`isCPNOverdue(nextCPN)`** : true si `daysLate > 7` jours (>1 semaine après la fin de fenêtre)
+- ✅ **PregnancyCard** : barre de progression CPN (0/8 → 8/8), bannière retard en semaines, libellés MAJ
+- ✅ Endpoint `GET /api/pregnancies` retourne désormais `done_cpns` (liste des numéros) et `cpn_count` pour alimenter la barre de progression
+- ✅ **62/62 tests pytest toujours OK**
+
+
 
 ## Backlog (P0 → P2)
 - P1: Appointments scheduler with calendar UI (model exists, UI is a list)

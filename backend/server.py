@@ -303,8 +303,15 @@ async def list_pregnancies(
             {"_id": 0},
             sort=[("visit_number", -1)],
         )
+        done_cpns = sorted({
+            d.get("visit_number") async for d in db.cpn_visits.find(
+                {"pregnancy_id": preg["id"]}, {"visit_number": 1, "_id": 0}
+            ) if d.get("visit_number") is not None
+        })
         preg["patient"] = patient
         preg["last_cpn"] = last_cpn
+        preg["done_cpns"] = done_cpns
+        preg["cpn_count"] = len(done_cpns)
         results.append(preg)
     return results
 
